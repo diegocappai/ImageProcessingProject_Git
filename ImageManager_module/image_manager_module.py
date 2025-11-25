@@ -17,9 +17,7 @@ class Immagine:
         #self.grado_patologia
 
     #metodo divide in patch
-    def create_patches(self):
-        tile_w = int(input("Inserisci larghezza patch:"))
-        tile_h = int(input("Inserisci altezza patch:"))
+    def create_patches(self, tile_w, tile_h):
         w, h = self.original_size
 
 
