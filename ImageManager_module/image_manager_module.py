@@ -2,22 +2,20 @@ import numpy as np
 from PIL import Image
 
 class Immagine:
-    def __init__(self):
-        self.image_obj = None
-        self.original_size = (0, 0)
-        self.patches = []
-        self.patches_coords = []
+    def __init__(self, image_path):
+        self.image_obj = Image.open(image_path)
+        #TODO se immagine molto grande può dare problemi (progettare versione successiva)
+
+        self.size = self.image_obj.size
+        #TODO verificare che sia una tupla
+
+        self.patches = [] #le patch non dovranno essere memorizzate nella versione finale
+        self.patches_coords = [] #lista coordinate sup-SX della patch
+
         #Da implementare:
         #self.IDpaziente
         #self.etichetta_patologia
         #self.grado_patologia
-
-    #metodo crea istanza immagine
-    def crea_immagine(self):
-        image_path = input("Inserisci percorso immagine: ")
-        self.image_obj = Image.open(image_path)
-        self.original_size = self.image_obj.size
-        return self.image_obj, self.original_size
 
     #metodo divide in patch
     def create_patches(self):
@@ -38,8 +36,11 @@ class Immagine:
             x_coords.append(w - tile_w)
         x_coords = sorted(list(set(x_coords)))
 
-        self.patches = []
+        #TODO lista coords unica: [(x1, y1), (x2, y2), ..., (xn, yn)]
+        #TODO end create_patches -> estrazione riservata a un altro modulo che chiama la singola patch
+
         self.patches_coords = []
+
 
         for y in y_coords:
             for x in x_coords:
@@ -55,22 +56,6 @@ class Immagine:
 
         return self.patches, self.patches_coords
 
-
-    #metodo ricostruisce immagine da patch
-    def reconstruct_image(self):
-        w, h = self.original_size
-
-        # Crea immagine vuota
-        result = Image.new("RGB", (w, h))
-
-        # Incolla ogni patch alla sua posizione
-        for patch_np, coords in zip(self.patches, self.patches_coords):
-            x, y = coords
-
-            patch_img = Image.fromarray(patch_np)
-            result.paste(patch_img, (x, y))
-
-        return result.show()
 
 
 
