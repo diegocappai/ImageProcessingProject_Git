@@ -12,7 +12,7 @@ class Immagine:
         self.patches = [] #le patch non dovranno essere memorizzate nella versione finale
         self.patches_coords = [] #lista coordinate sup-SX della patch
 
-        #Da implementare:
+        #TODO implementare:
         #self.IDpaziente
         #self.etichetta_patologia
         #self.grado_patologia
