@@ -5,7 +5,7 @@ import csv
 
 # --- CONFIGURAZIONE ---
 # Modifica questo percorso con la cartella dove hai le tue patch
-#FOLDER_PATCHES = r"C:\Users\diego\PycharmProjects\ImageProcessingProject\ImageManager_module\patch"
+#FOLDER_PATCHES = r"C:\Users\diego\PycharmProjects\ImageProcessingProject\ImageManager_Package\patch"
 #FILE_OUTPUT = "annotazioni.csv"
 ESTENSIONI = ('.png', '.jpg', '.jpeg', '.tif')
 

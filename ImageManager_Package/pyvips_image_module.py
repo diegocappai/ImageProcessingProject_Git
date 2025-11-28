@@ -9,7 +9,6 @@ class Image:
         self.tile_h = tile_h
         self.patches_coords = self.get_coords()
 
-
     # Determina la lista di coordinate di tutte le patch
     def get_coords(self,):
         file_path = self.file_path
