@@ -64,7 +64,7 @@ class Image:
             print("Coordinata non trovata!")
 
 
-    # Estrae e salva una singola patch
+    # Estrae una singola patch
     def extract_patch(self, output_path, tile_coords):
         file_path = self.file_path
 
@@ -75,8 +75,7 @@ class Image:
         # Esegue il ritaglio con le coordinate fornite come argomento
         patch = image.crop(tile_coords[0], tile_coords[1], tile_coords[2], tile_coords[3])
 
-        # Salva patch su disco
-        patch.write_to_file(output_path)
+        return patch
 
 
 # ==========================================
