@@ -56,10 +56,10 @@ class Image:
         tile_h = self.tile_h
         patches_coords = self.patches_coords
 
-        tile = next((t for t in patches_coords if t[0]<= x_coord <(t[0]+tile_w) and t[1]<= y_coord <(t[1]+tile_h)))
+        tile_coords = next((t for t in patches_coords if t[0]<= x_coord <(t[0]+tile_w) and t[1]<= y_coord <(t[1]+tile_h)))
 
-        if tile:
-            return tile
+        if tile_coords:
+            return tile_coords
         else:
             print("Coordinata non trovata!")
 
