@@ -4,7 +4,7 @@ def get_manager(method, file_path, tile_w, tile_h):
         from .pyvips_manager_module import VipsImageManager
         return VipsImageManager(file_path, tile_w, tile_h)
 
-    # TODO decidere se implementare secondo metodo:
+    # TODO decidere se implementare secondo metodo (TiffSlide):
     """
     elif method == 'method_2':
         from .method2_manager_module import Method2ImageManager
