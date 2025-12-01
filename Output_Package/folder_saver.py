@@ -5,11 +5,10 @@ import os
 
 class FolderDataSetSaver(DatasetSaver):
     def __init__(self, output_path):
-        self.output_path = output_path
+        super().__init__(output_path)
         self.csv_buffer = []
 
-        # Crea cartella di salvataggio
-        os.makedirs(self.output_path, exist_ok=True)
+
 
     def __enter__(self):
         # Garantire scrittura del file .csv
