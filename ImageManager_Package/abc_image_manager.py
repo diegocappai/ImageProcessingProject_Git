@@ -63,5 +63,5 @@ class ImageManager(ABC):
     # TODO implementare metodo per scartare patch senza tessuto:
     """
     # Filtrare patch senza tessuto
-    def get_tessue_coords(self):
+    def get_tissue_coords(self):
     """
