@@ -141,12 +141,53 @@ Qual è lo scopo di questo approccio: data l'impossibilità pratica di etichetta
 Spesso in letteratura vengono forniti dataset con immagini già divise in patch, senza informazioni circa l'immagine originale, o con informazioni parziali (per es. [unitopatho](https://github.com/EIDOSLAB/UNITOPATHO) ). E' necessario che il programma possa accettare come input anche immagini in questa forma.
 
 
-##  statistiche sui dati
+##  Statistiche sui dati
 
-Il programma deve fornire statistiche sui dati elaborati (quante imamgini - quante patch - attribuzione alle varie classi, sia a livello di immagine sia di patch
+Il programma deve fornire statistiche sui dati elaborati (quante immmagini - quante patch - attribuzione alle varie classi, sia a livello di immagine sia di patch)
+
+
+----
 
 # PROPOSTA TESI
 
-Ragionare su un formato standard per i dataset - analogo a BID per EEG
+## Proposta 1
+Ragionare su un formato standard per i dataset - analogo a BID per EEG. Esaminare le proposte presenti e formularne una nuova.
+
+In digital pathology è comune l'esigenza di conservare, scambiare, annotare dataset di immagini in un formato che consenta facilmente l'accesso alle immagini a vari livelli di risoluzione, l'accesso alle singole patch, l'accesso alle annotazioni. Un problema analogo si è presentato nello studio dei tracciati EEG. In quel caso è stato proposto il formato BIDS (https://bids-specification.readthedocs.io/en/stable/modality-specific-files/electroencephalography.html). Per le immagini istopatologiche non esiste ancora una proposta equivalente.
+
+https://link.springer.com/chapter/10.1007/978-3-319-20379-9_9
+
+https://pubmed.ncbi.nlm.nih.gov/40740735/
+
+https://arxiv.org/abs/2505.12120 (non è una proposta di standard ma un esempio di come gestire i dati - ci può essere utile anche per avere immagini di prova per il programma)
+
+
+
+### Come potrebbero essere (o come stanno andando) le “estensioni BIDS-like” per patologia digitale
+
+-> **TABELLA GENERATA DA CHATGPT, da prendere  con le pinze**
+
+| Caratteristica / requisito | Come è coperta oggi / da cosa c’è già |
+|----------------------------|----------------------------------------|
+| **Struttura directory + convenzioni di naming (tipo BIDS)** | Nessuno standard condiviso. Vari gruppi usano convenzioni custom. I formati container come *IFE* potrebbero facilitare strutture coerenti. |
+| **Metadata standardizzati (scanner, acquisizione, stain, paziente, ecc.)** | *OME-TIFF / OME-XML* molto usati nella ricerca; *DICOM WSI* standard clinico; *IFE* integra metadata flessibili. |
+| **Piramide multi-risoluzione + accesso efficiente alle patch/tiles** | *OME-TIFF* supporta sub-IFD per piramidi; *IFE* ottimizzato per accesso tile-based e streaming; nei formati proprietari è nativo ma non standardizzato. |
+| **Annotazioni integrate (ROI, maschere, regioni semantiche)** | In molti workflow restano file esterni → rischio disallineamento. *IFE* supporta blocchi di annotazioni integrati. Altri formati: soluzioni ad hoc. |
+| **Compatibilità con archiviazione clinica / PACS** | *DICOM WSI* è lo standard destinato a uso clinico e archiviazione a lungo termine. |
+| **Adatto a ricerca, AI, condivisione multi-centro, FAIR** | *OME-TIFF / OME-Zarr* molto diffusi in community di imaging; IFE promettente; dataset come HISTAI mostrano buone pratiche ma non uno standard formale. |
+
+
+
+## Proposta 2 
+
+Questo elenco di proposte sono più sul lato machine learning - occorre ragionarci
+
+- https://en.wikipedia.org/wiki/Multiple_instance_learning
+- self-training /active learning per completare l'etichettatura a livello di patch?
+
+
+
+
+
 
 
