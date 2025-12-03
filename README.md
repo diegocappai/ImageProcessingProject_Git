@@ -116,18 +116,36 @@ L’orchestratore deve essere scritto in modo modulare e configurabile, in modo 
 - poter sostituire facilmente un modulo (input, elaborazione o output) con un altro;
 - adattarsi a flussi di lavoro diversi (ad esempio diversi formati di input o modalità di annotazione).
 
+----
+
 # NOTE 02.12.2025
 
 
-- setting iniziali: quante classi?
-- calibrazione (dimensione patch)
+## setting iniziali:
 
-- L'etichettatura a livello di singola patch può rivelarsi eccessivamente lunga e in concreto non gestibile. 
-  - etichettatura fine su train, a livello di paziente su test - occorre quindi definire train e test già durante annotazione
- 
-- statistiche suo dati
+Prima di cominciare l'operazione di annotazione, l'esperto deve scegliere le dimensioni delle patch. Esplora il dataset, visualizza una o più immagini  e sceglie la dimensione della patch. Si può pensare ad una interfaccia che mostra l'immagine con in sovrapposizione una griglia che mostra le patch. Un cursore permette di modificare la dimensione delle patch. Un altro cursore (o controllo analogo) permette di effettuare uno zoom. Quando l'esperto ha visionato un numero di immagini ritenuto sufficiente, conferma la dimensione della patch, che varrà per tutte le immagini della sessione.
 
-Versione del programma che accetti in input immagini già divise in patch
+
+## logica di etichettatura.
+
+L'etichettatura a livello di singola patch di tutto il dataset può rivelarsi eccessivamente lunga e in concreto non gestibile. Occorre pianificare un percorso alternativo.
+
+- L'esperto ha la _possibilità_ di dividere il dataset in due parti, A e B. la divisione può essere random, manuale dopo ispezione visiva, o definita secondo un certo criterio (es. fanno parte di A le immagini da 1 a n)
+- Sulla parte A si procede come detto all'etichettatura della singola patch
+- Sulla parte B si assegna globalmente una singola etichetta. Se l'immagine aveva già una sua etichetta globale, il programma può acquisire quella. La parte B non ha una etichetta a livello di patch.
+
+Qual è lo scopo di questo approccio: data l'impossibilità pratica di etichettare a livello di patch l'intero dataset, si può etichettare ogni singola patch del training set, che può essere anche molto piccolo. Per il test set non sono necessarie le etichette a livello di patch, perché siamo interessati a dare una valutazione sullo stato del _paziente_, non della patch. Se il dataset A è costituito da n immagini, con n piccolo, si può utilizzare A come train e B come test. Oppure se i numeri lo consentono si possono realizzare vari training set estraendoli da A
+
+## Gestione dell'input
+
+Spesso in letteratura vengono forniti dataset con immagini già divise in patch, senza informazioni circa l'immagine originale, o con informazioni parziali (per es. [unitopatho](https://github.com/EIDOSLAB/UNITOPATHO) ). E' necessario che il programma possa accettare come input anche immagini in questa forma.
+
+
+##  statistiche sui dati
+
+Il programma deve fornire statistiche sui dati elaborati (quante imamgini - quante patch - attribuzione alle varie classi, sia a livello di immagine sia di patch
+
+# PROPOSTA TESI
 
 Ragionare su un formato standard per i dataset - analogo a BID per EEG
 
