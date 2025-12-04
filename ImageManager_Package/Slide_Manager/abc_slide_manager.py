@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
+from ImageManager_Package.abc_general_manager import ImageManager
 import numpy as np
 import cv2
 import random
 
 
 
-class ImageManager(ABC):
-    def __init__(self, file_path, tile_w, tile_h):
-        self.file_path = file_path
+class SlideManager(ImageManager, ABC):
+    def __init__(self, input_path, tile_w, tile_h):
+        super().__init__(input_path)
         self.tile_w = tile_w
         self.tile_h = tile_h
         self.patches_coords = self.get_coords()
@@ -33,17 +34,16 @@ class ImageManager(ABC):
         # Converte in immagine RGB
         pass
 
-    @abstractmethod
-    def is_patch_valid(self, patch, min_tissue_percent):
-        # Controlla che la patch abbia abbastanza tessuto
-        pass
-
     # Calcola tutte le coordinate delle patch
     def get_coords(self):
         y_coords = self._calcola_coords_asse(self.height, self.tile_h)
         x_coords = self._calcola_coords_asse(self.width, self.tile_w)
         self.patches_coords = [(x, y, self.tile_w, self.tile_h) for y in y_coords for x in x_coords]
         return self.patches_coords
+
+    # TODO ragionare se scelta migliore o evitabile
+    def get_items(self):
+        return self.get_coords()
 
     # Calcola coordinate patch per asse
     def _calcola_coords_asse(self, total_size, tile_size):
