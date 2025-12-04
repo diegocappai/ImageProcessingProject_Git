@@ -6,12 +6,13 @@ class DatasetSaver(ABC):
     def __init__(self, output_path):
         self.output_path = output_path
 
-        # Crea cartella se non esiste
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path)
 
     @abstractmethod
-    def save_patch(self, patch, coords_tile, etichetta, ID):
+    def save_patch_Slide(self, patch, coords_tile, etichetta, ID):
+        pass
+
+    @abstractmethod
+    def save_patch_Dataset(self, file_name, etichetta):
         pass
 
     def __enter__(self):

@@ -8,6 +8,10 @@ class FolderDataSetSaver(DatasetSaver):
         super().__init__(output_path)
         self.csv_buffer = []
 
+        self.row_header = None
+
+        os.makedirs(self.output_path, exist_ok=True)
+
 
 
     def __enter__(self):
@@ -15,8 +19,12 @@ class FolderDataSetSaver(DatasetSaver):
         return self
 
 
-    def save_patch(self, patch, coords_tile, etichetta, ID):
+    def save_patch_Slide(self, patch, coords_tile, etichetta, ID):
         """ Salva patch e metadati in memoria """
+
+        # Definiamo header file .csv per Patch da WSI
+        if self.row_header is None:
+            self.row_header = ['Nome patch', 'Coordinate', 'Etichetta', 'ID']
 
         # Definiamo nome file_patch
         image_filename = f"patch_{coords_tile}.png"
@@ -31,6 +39,14 @@ class FolderDataSetSaver(DatasetSaver):
 
         print(f"Dati patch salvati correttamente!")
 
+    def save_patch_Dataset(self, file_name, etichetta):
+        """ Salva etichetta patch (Dataset) su file .csv"""
+        # Definiamo header file .csv per Patch da Dataser
+        if self.row_header is None:
+            self.row_header = ['Nome patch', 'Etichetta']
+        self.csv_buffer.append([file_name, etichetta])
+        print(f"Dati patch salvati correttamente!")
+
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """ Crea il file metadati.csv nella stessa cartella delle patch"""
@@ -41,8 +57,11 @@ class FolderDataSetSaver(DatasetSaver):
         try:
             with open(csv_path, 'w', newline='') as file:
                 writer = csv.writer(file)
+
                 # Definiamo l'header
-                writer.writerow(['Nome patch', 'Coordinate','Etichetta', 'ID'])
+                if self.row_header:
+                    writer.writerow = self.row_header
+
                 # Scrivi tutti i dati accumulati
                 writer.writerows(self.csv_buffer)
             print(f"File CSV salvato correttamente!")
