@@ -1,3 +1,4 @@
+from Utils.set_pyvips import setup_vips
 import pyvips
 import os
 

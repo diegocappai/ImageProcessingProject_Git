@@ -1,4 +1,5 @@
 from .abc_slide_manager import SlideManager
+from Utils.set_pyvips import setup_vips
 import pyvips
 import numpy as np
 
