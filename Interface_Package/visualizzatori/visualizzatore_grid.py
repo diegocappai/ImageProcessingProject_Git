@@ -1,5 +1,5 @@
 from .visualizzatore_base import VisualizzatoreBase
-from Interfaccia_Package.views.widgets.grid_overlay_label import GridOverlayLabel
+from Interface_Package.widgets.grid_overlay_label import GridOverlayLabel
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import QSize
