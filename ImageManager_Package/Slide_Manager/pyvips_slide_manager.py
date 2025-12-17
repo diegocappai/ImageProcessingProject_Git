@@ -17,7 +17,7 @@ class VipsSlideManager(SlideManager):
     def height(self): return self.vips_image.height
 
     def extract_patch(self, tile_coords):
-        return self.vips_image.crop(tile_coords)
+        return self.vips_image.crop(tile_coords[0], tile_coords[1], tile_coords[2], tile_coords[3])
 
     def load_thumbnail_rgb(self, max_width=1024):
         best_level = 0
@@ -53,4 +53,9 @@ class VipsSlideManager(SlideManager):
             loaded_thumb = loaded_thumb.colourspace('srgb')
 
         return loaded_thumb.cast("uchar")
+
+    def load_thumbnail_numpy(self, vips_thumb):
+        mem = vips_thumb.write_to_memory()
+        img_np = np.ndarray(buffer=mem, dtype=np.uint8, shape=[vips_thumb.height, vips_thumb.width, 3])
+        return img_np
 

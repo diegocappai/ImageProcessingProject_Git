@@ -150,7 +150,7 @@ class Model(QObject):
 
             elif self.method_input == "Slide":
                 coords = self.current_meta
-                self.writer.save_patch_WSI(patch, coords, label, self.ID_paziente)
+                self.writer.save_patch_Slide(patch, coords, label, self.ID_paziente)
                 if self.method_show == "Slide":
                     pass
                 elif self.method_show == "Patch":

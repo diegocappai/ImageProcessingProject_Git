@@ -4,14 +4,32 @@ import os
 
 
 class FolderDataSetSaver(DatasetSaver):
-    def __init__(self, output_path):
-        super().__init__(output_path)
-        self.csv_buffer = []
+    def __init__(self, base_path):
+        self.output_path = self._calcola_cartella_univoca(base_path)
+        super().__init__(self.output_path)
 
+        self.csv_buffer = []
         self.row_header = None
 
         os.makedirs(self.output_path, exist_ok=True)
 
+
+    def _calcola_cartella_univoca(self, base_path):
+            folder_name = "ImageProcessingResults"
+            full_path = os.path.join(base_path, folder_name)
+
+            if not os.path.exists(full_path):
+                return full_path
+
+            counter = 1
+            while True:
+                new_name = f"{folder_name}({counter})"
+                new_full_path = os.path.join(base_path, new_name)
+
+                if not os.path.exists(new_full_path):
+                    return new_full_path
+
+                counter += 1
 
 
     def __enter__(self):
@@ -60,7 +78,7 @@ class FolderDataSetSaver(DatasetSaver):
 
                 # Definiamo l'header
                 if self.row_header:
-                    writer.writerow = self.row_header
+                    writer.writerow(self.row_header)
 
                 # Scrivi tutti i dati accumulati
                 writer.writerows(self.csv_buffer)
