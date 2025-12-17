@@ -1,4 +1,3 @@
-import ImageManager_Package.set_pyvips
 import pyvips
 import os
 
