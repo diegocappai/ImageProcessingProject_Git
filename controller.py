@@ -9,7 +9,7 @@ from Interface_Package.views.page_setting_slide import PageRequestSlide
 from Interface_Package.main_window import MainWindow, PageID
 
 # Import del Model
-from model import AppModel
+from model import Model
 
 # Import funzione di utilità per convertire oggetti PyVips
 from Utils.pyvips_to_qpixmap import pyvips_to_qpixmap
@@ -21,7 +21,7 @@ class Controller(QObject):
         self.app = QApplication(sys.argv)
 
         # Inizializzo il Model
-        self.model = AppModel()
+        self.model = Model()
         # Inizializzo la View (Main Window)
         self.view = MainWindow()
 
