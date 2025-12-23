@@ -80,33 +80,47 @@ class SlideManager(ImageManager, ABC):
 
     # Filtra patch senza tessuto (Filtro Veloce)
     def get_tissue_coords(self, target_dim=1024, tissue_coverage=0.1):
-        # 1. Carica l'immagine
+        # --- PREPARAZIONE ANTEPRIMA ---
+        # Carica thumbnail (RGB) dell'immagine
         thumb_manager = self.load_thumbnail_rgb(target_dim)
+        # Converte l'oggetto pyvips in un array NumPy per poter usare OpenCV
         thumb_array = self.load_thumbnail_numpy(thumb_manager)
 
-        # 2. Elaborazione OpenCV
+        # --- SEGMENTAZIONE TESSUTO ---
+        # Converte l'immagine da RGB a HVS
         hsv = cv2.cvtColor(thumb_array, cv2.COLOR_RGB2HSV)
+
+        # Prende il canale S (Saturazione)
         s_channel = hsv[:, :, 1]
+
+        # Applica la soglia di Otsu: un algoritmo che trova automaticamente il punto di sperazione tra pixel "chiari" e "scuri"
         _, binary_mask = cv2.threshold(s_channel, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Chiusura buchi
+        # Chiusura buchi all'interno del tessuto e unione zone frammentate
         kernel = np.ones((5, 5), np.uint8)
         binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-        # Creiamo la griglia virtuale
+        # --- CREAZIONE GRIGLIA VIRTUALE ---
+        # Calcola numero patch nell'immagine reale a piena risoluzione
         n_patches_x = self.width // self.tile_w
         n_patches_y = self.height // self.tile_h
 
         if n_patches_x == 0 or n_patches_y == 0: return []
 
-        # Resize maschera per matchare numero di patch (Interpolazione Nearest per velocità)
+        # --- MAPPATURA MASCHERA -> GRIGLIA ---
+        # Resize maschera in modo che ogni pixel corrisponda a una patch della griglia
         mini_mask = cv2.resize(binary_mask, (n_patches_x, n_patches_y), interpolation=cv2.INTER_NEAREST)
+
+        # Normalizza i valori da [0, 255] a [0, 1]
         mini_mask = mini_mask / 255.0
 
+        # --- FILTRAGGIO E CONVERSIONE COORDINATE ---
+        # Trova gli indici dove la percentual di tessuto è superiore alla soglia
         valid_indices = np.argwhere(mini_mask >= tissue_coverage)
         valid_coords = []
 
         for row, col in valid_indices:
+            # Trasforma le coordinate della "mini-maschera" nelle coordinate reali
             real_x = int(col * self.tile_w)
             real_y = int(row * self.tile_h)
             valid_coords.append((real_x, real_y, self.tile_w, self.tile_h))
