@@ -1,25 +1,33 @@
 import os
+import platform
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # Percorso della cartella bin di VipsE
 #VIPSHOME = r'C:\Path\vips\vips-dev-8.17\bin'
-VIPSHOME = r'C:\Users\diego\vips\vips-dev-8.17\bin'
 
 
 
 def setup_vips():
     # Configura l'ambiente per permettere a pyvips di trovare le DLL su Windows
-    if os.path.exists(VIPSHOME):
+    if platform.system() != "Windows":
+        return
+
+    vips_home = os.getenv("VIPS_HOME", r'C:\vips\vips-dev-8.17\bin')
+
+    if os.path.exists(vips_home):
         # Aggiunge al PATH
-        os.environ['PATH'] = VIPSHOME + ';' + os.environ['PATH']
+        os.environ['PATH'] = vips_home + ';' + os.environ['PATH']
 
         if hasattr(os, 'add_dll_directory'):
             try:
-                os.add_dll_directory(VIPSHOME)
+                os.add_dll_directory(vips_home)
             except Exception as e:
                     print(f"Errore caricamento DLL directory: {e}")
     else:
-        print(f"ATTENZIONE: Percorso Vips non trovato: {VIPSHOME}")
+        print(f"ATTENZIONE: Percorso Vips non trovato: {vips_home}")
 
 
 # Esegue la configurazione appena questo file viene importato

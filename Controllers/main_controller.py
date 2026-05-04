@@ -243,6 +243,8 @@ class AppController(QObject):
         self.main_window.stack.setCurrentWidget(self.dashboard_view)
 
     def apri_schermata_etichettatura(self):
+        self.etichettatura_view = EtichettaturaWindow()
+
         self.etichettatura_controller = EtichettaturaController(self.project_manager, self.etichettatura_view)
 
         self.etichettatura_controller.naviga_alla_dashboard = self.flusso_torna_alla_dashboard
