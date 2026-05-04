@@ -28,7 +28,6 @@ class VisualizzatoreBase(QScrollArea):
         # Il widget interno viene iniettato dalla sottoclasse
         self.image_widget = internal_widget
         self.image_widget.setAlignment(Qt.AlignCenter)
-        self.image_widget.setScaledContents(True)
         self.setWidget(self.image_widget)
 
     # --- LOGICA ZOOM ---
@@ -80,8 +79,6 @@ class VisualizzatoreBase(QScrollArea):
             self.setCursor(Qt.OpenHandCursor)
         super().mouseReleaseEvent(event)
 
-
-
     # --- METODI HELPER ---
     # Centraggio zoom
     def adjust_scrollbar(self, scrollbar, factor):
@@ -103,8 +100,19 @@ class VisualizzatoreBase(QScrollArea):
 
     def aggiorna_visualizzazione(self):
         """
-        Metodo che applica il resize.
+        Metodo che applica il resize con SmoothTransformation per la massima qualità.
         """
         if self.original_pixmap:
+            # 1. Calcoliamo la nuova dimensione in base allo zoom
             new_size = self.original_pixmap.size() * self.scale_factor
+
+            # 2. Scaliamo l'immagine ORIGINALE usando l'algoritmo ad alta qualità
+            pixmap_scalata = self.original_pixmap.scaled(
+                new_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation  # IL SEGRETO DELLA QUALITÀ
+            )
+
+            # 3. Aggiorniamo la dimensione del contenitore e gli passiamo la nuova immagine perfetta
             self.image_widget.resize(new_size)
+            self.image_widget.setPixmap(pixmap_scalata)

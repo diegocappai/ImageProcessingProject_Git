@@ -17,9 +17,10 @@ class ImageManager(ABC):
         # Dato un nome file o coord resituisce oggetto patch
         pass
 
-    @abstractmethod
+    """@abstractmethod
     def extract_iterator_patches(self, method):
         pass
+    """
 
     def is_patch_valid(self, patch, min_tissue_percent=0.5):
         # Controlla se la patch reale contiene abbastanza tessuto.

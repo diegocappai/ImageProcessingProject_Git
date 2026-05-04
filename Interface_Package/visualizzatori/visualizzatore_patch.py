@@ -20,7 +20,6 @@ class VisualizzatorePatch(VisualizzatoreBase):
         #self.image_widget.clear()
         #self.reset_interfaccia()
 
-
     def mostra_immagine(self, pixmap):
         self.original_pixmap = pixmap
         if self.original_pixmap.isNull():
@@ -28,8 +27,10 @@ class VisualizzatorePatch(VisualizzatoreBase):
             return
 
         self.adatta_a_finestra()
+
+        # Chiamando questo metodo, la classe Base calcolerà la dimensione,
+        # applicherà lo SmoothTransformation e la setterà sulla Label!
         self.aggiorna_visualizzazione()
-        self.image_widget.setPixmap(self.original_pixmap)
 
     def mostra_loading(self):
         self.message_label.setText("Caricamento patch successiva...")

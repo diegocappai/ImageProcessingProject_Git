@@ -1,5 +1,11 @@
-from .visualizzatore_base import VisualizzatoreBase
-from Interface_Package.widgets.grid_overlay_label import GridOverlayLabel
+# =====================================================================
+# ---------------------- DA POTER ELIMINARE ---------------------------
+# ----------METODO "DOPPIO CLICK" POTREBBE ESSERE UTILE ---------------
+# =====================================================================
+
+
+from Interface_Package.visualizzatori.visualizzatore_base import VisualizzatoreBase
+from cestino.grid_overlay_label import GridOverlayLabel
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Signal, Qt, QSize
 

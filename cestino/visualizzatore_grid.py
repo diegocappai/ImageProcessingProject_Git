@@ -1,5 +1,5 @@
-from .visualizzatore_base import VisualizzatoreBase
-from Interface_Package.widgets.grid_overlay_label import GridOverlayLabel
+from Interface_Package.visualizzatori.visualizzatore_base import VisualizzatoreBase
+from cestino.grid_overlay_label import GridOverlayLabel
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import QSize
@@ -53,12 +53,15 @@ class VisualizzatoreGriglia(VisualizzatoreBase):
 
         # AGGIUNGIAMO la logica specifica della griglia
         if self.original_pixmap and not self.real_img_size.isEmpty():
+
+            # Larghezza in pixel che l'immagine occupa sullo schermo
+            larghezza_a_schermo = self.image_widget.width()
+
             # Calcoliamo il rapporto: Larghezza Thumbnail / Larghezza Originale
-            thumb_w = self.original_pixmap.width()
             orig_w = self.real_img_size.width()
             orig_h = self.real_img_size.height()
 
-            current_ratio = thumb_w / orig_w if orig_w > thumb_w > 0 else 1.0
+            current_ratio = larghezza_a_schermo / orig_w if orig_w > 0 else 1.0
 
 
 

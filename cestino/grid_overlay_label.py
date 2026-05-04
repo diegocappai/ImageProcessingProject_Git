@@ -45,47 +45,42 @@ class GridOverlayLabel(QLabel):
         painter = QPainter(self)
         painter.setPen(self.grid_pen)
 
-        # Dimensioni attuali del widget a schermo
         view_w = self.width()
         view_h = self.height()
-
-        # Moltiplica riduzione miniatura * zoom utente
         factor = self.ratio * self.scale_factor
 
-        # CALCOLO ASSE X (centrando le tiles)
-        num_cols = self.orig_w // self.grid_w
+        # ==========================================
+        # HELPER INTERNO PER UNIFICARE GLI ASSI
+        # ==========================================
+        def disegna_assi(orig_dim, grid_dim, view_limit, is_vertical):
+            step = grid_dim * factor
 
-        remainder_w = self.orig_w % self.grid_w
+            # Se le linee sono troppo fitte (es. < 3px), saltiamo il disegno per non freezare l'app
+            if step <= 3:
+                return
 
-        offset_x_orig = remainder_w // 2
+            num_lines = orig_dim // grid_dim
+            offset_orig = (orig_dim % grid_dim) // 2
+            start_pos = offset_orig * factor
 
-        start_x = offset_x_orig * factor
-        step_x = self.grid_w * factor
+            for i in range(num_lines + 1):
+                pos = int(start_pos + (i * step))
 
-        if step_x > 3:
-            for i in range(num_cols + 1):
-                pos = int(start_x + (i * step_x))
-                if 0 <= pos < view_w:
-                    painter.drawLine(int(pos), 0, int(pos), view_h)
+                # Controllo di sicurezza: disegniamo solo se la linea cade dentro la finestra visibile
+                if 0 <= pos <= view_limit:
+                    if is_vertical:
+                        # Asse X: Disegna una linea in verticale dall'alto (0) al basso (view_h)
+                        painter.drawLine(pos, 0, pos, view_h)
+                    else:
+                        # Asse Y: Disegna una linea in orizzontale da sinistra (0) a destra (view_w)
+                        painter.drawLine(0, pos, view_w, pos)
 
+        # Richiamiamo la funzione per l'Asse X (Linee Verticali)
+        # Il limite visivo è view_w
+        disegna_assi(self.orig_w, self.grid_w, view_w, is_vertical=True)
 
-        # CALCOLO ASSE Y
-        num_rows = self.orig_h // self.grid_h
-
-        remainder_h = self.orig_h % self.grid_h
-
-        offset_y_orig = remainder_h // 2
-
-        start_y = offset_y_orig * factor
-        step_y = self.grid_h * factor
-
-        if step_y > 3:
-            for i in range(num_rows + 1):
-                pos = int(start_y + (i * step_y))
-                if 0 <= pos < view_w:
-                    painter.drawLine(0, int(pos), view_w, int(pos))
-
-        # TODO ragionare su metodo unico per asse X e Y
-
+        # Richiamiamo la funzione per l'Asse Y (Linee Orizzontali)
+        # Il limite visivo è view_h
+        disegna_assi(self.orig_h, self.grid_h, view_h, is_vertical=False)
 
         painter.end()

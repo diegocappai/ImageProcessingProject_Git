@@ -2,7 +2,9 @@ import os
 
 
 # Percorso della cartella bin di VipsE
-VIPSHOME = r'C:\Path\vips\vips-dev-8.17\bin'
+#VIPSHOME = r'C:\Path\vips\vips-dev-8.17\bin'
+VIPSHOME = r'C:\Users\diego\vips\vips-dev-8.17\bin'
+
 
 
 def setup_vips():
@@ -11,7 +13,6 @@ def setup_vips():
         # Aggiunge al PATH
         os.environ['PATH'] = VIPSHOME + ';' + os.environ['PATH']
 
-        # Passaggio per Python 3.8+
         if hasattr(os, 'add_dll_directory'):
             try:
                 os.add_dll_directory(VIPSHOME)
