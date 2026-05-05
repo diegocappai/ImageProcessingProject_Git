@@ -1,7 +1,8 @@
 from typing import Optional, Dict
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                QLabel, QComboBox, QRadioButton, QPushButton,
-                               QMessageBox, QGraphicsPixmapItem, QCheckBox)
+                               QMessageBox, QGraphicsPixmapItem, QCheckBox,
+                               QListWidget, QLineEdit, QGridLayout)
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QCloseEvent
 
@@ -24,7 +25,7 @@ class ImpostazioniSlideDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Digital Pathology Lab - Impostazioni Slide")
-        self.setMinimumWidth(750)
+        self.setMinimumWidth(850)
 
         self.current_hd_tile: Optional[QGraphicsPixmapItem] = None
 
@@ -140,6 +141,48 @@ class ImpostazioniSlideDialog(QDialog):
         self.label_n_patch_roi.setProperty("class", "HighlightLabel")
         right_vlayout.addWidget(self.label_n_patch_roi)
 
+        right_vlayout.addSpacing(15)
+
+        # SEZIONE ETICHETTE
+        etichette_label = QLabel("Classi di Etichette:")
+        right_vlayout.addWidget(etichette_label)
+
+        # --- Etichette Standard ---
+        standard_label = QLabel("Standard:")
+        right_vlayout.addWidget(standard_label)
+
+        self.checkboxes_labels = []
+        classi_fisse = ["Normal", "Tumor", "Stroma", "Necrosi", "Infiammazione", "Vasi Sanguigni", "Mucina"]
+
+        self.grid_labels = QGridLayout()
+        self.grid_labels.setVerticalSpacing(5)
+        self.grid_labels.setHorizontalSpacing(10)
+
+        for i, nome_classe in enumerate(classi_fisse):
+            cb = QCheckBox(nome_classe)
+            if nome_classe in ["Normal", "Tumor"]:
+                cb.setChecked(True)
+
+            cb.clicked.connect(self.verifica_limite_spunte)
+            self.checkboxes_labels.append(cb)
+            self.grid_labels.addWidget(cb, i // 2, i % 2)
+
+        right_vlayout.addLayout(self.grid_labels)
+        right_vlayout.addSpacing(10)
+
+        # Layout Inserimento
+        input_etichetta_layout = QHBoxLayout()
+        self.input_nuova_etichetta = QLineEdit()
+        self.input_nuova_etichetta.setPlaceholderText("Es. Personalizzata...")
+
+        self.btn_aggiungi_etichetta = QPushButton("Aggiungi")
+        self.btn_aggiungi_etichetta.clicked.connect(self.aggiungi_etichetta)
+        self.input_nuova_etichetta.returnPressed.connect(self.aggiungi_etichetta)
+
+        input_etichetta_layout.addWidget(self.input_nuova_etichetta)
+        input_etichetta_layout.addWidget(self.btn_aggiungi_etichetta)
+        right_vlayout.addLayout(input_etichetta_layout)
+
         top_hlayout.addLayout(right_vlayout, stretch=1)
         content_layout.addLayout(top_hlayout)
 
@@ -158,7 +201,7 @@ class ImpostazioniSlideDialog(QDialog):
         perc_layout.addStretch()
         content_layout.addLayout(perc_layout)
 
-        order_label = QLabel("Strategia di visualizzazione per l'etichettatura:")
+        order_label = QLabel("Ordine di visualizzazione per l'etichettatura:")
         content_layout.addWidget(order_label)
 
         self.radio_seq = QRadioButton("Sequenziale")
@@ -197,6 +240,56 @@ class ImpostazioniSlideDialog(QDialog):
             self.aggiorna_grandezza_patch.emit(valore_intero)
         except ValueError:
             pass
+
+    def aggiungi_etichetta(self):
+        """Aggiunge una classe custom con controlli incrociati."""
+        testo = self.input_nuova_etichetta.text().strip()
+        if not testo:
+            return
+
+        # Controllo limite massimo
+        if len(self.get_classi_etichette()) >= 9:
+            QMessageBox.warning(self, "Limite Raggiunto", "Hai già 9 etichette attive! Deseleziona almeno un classe esistente prima di aggiungerne una nuova.")
+            return
+        esistenti = [cb.text().lower() for cb in self.checkboxes_labels]
+        if testo.lower() in esistenti:
+            QMessageBox.warning(self, "Attenzione", f"La classe '{testo}' già esistente!")
+            return
+
+        new_label = QCheckBox(testo)
+        new_label.setChecked(True)
+        new_label.clicked.connect(self.verifica_limite_spunte)
+
+        indice_attuale = len(self.checkboxes_labels)
+        riga = indice_attuale // 2
+        colonna = indice_attuale % 2
+
+        self.checkboxes_labels.append(new_label)
+        self.grid_labels.addWidget(new_label, riga, colonna)
+
+        self.input_nuova_etichetta.clear()
+        self.input_nuova_etichetta.setFocus()
+
+    def verifica_limite_spunte(self):
+        if len(self.get_classi_etichette()) <= 9:
+            return
+
+        QMessageBox.warning(self,"Limite Massimo", "Puoi selezionare massimo 9 etichette.")
+
+        checkbox_sel = self.sender()
+        if checkbox_sel:
+            checkbox_sel.blockSignals(True)
+            checkbox_sel.setChecked(False)
+            checkbox_sel.blockSignals(False)
+
+    def salvataggio_sicuro(self):
+        """Validazione finale prima di generare il progetto."""
+        etichette_scelte = self.get_classi_etichette()
+
+        if len(etichette_scelte) == 0:
+            QMessageBox.critical(self, "Errore Setup","Devi definire almeno una classe di etichetta per creare il progetto!")
+            return
+        self.accept()
 
     # ==========================================
     # API PUBBLICHE
@@ -265,6 +358,12 @@ class ImpostazioniSlideDialog(QDialog):
 
     def aggiorna_conteggio_roi(self, n):
         self.label_n_patch_roi.setText(f"Patch valide nelle ROI:\n{n}")
+
+    def get_classi_etichette(self) -> list:
+        """
+        Assembla un'unica lista pulita unendo le Checkbox attivate e le classi Custom aggiunte
+        """
+        return [cb.text() for cb in self.checkboxes_labels if cb.isChecked()]
 
     def get_dimensioni_miniatura(self) -> tuple:
         return self.roi_view.get_dimensioni_scena()

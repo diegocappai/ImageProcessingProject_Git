@@ -105,6 +105,9 @@ class AppController(QObject):
         setup_controller = SetupSlideController(model, view)
 
         if setup_controller.esegui():
+            classi_scelte = view.get_classi_etichette()
+            if not classi_scelte:
+                classi_scelte = ["Tessuto Normale", "Necrosi", "Infiammazione"]
             parametri = {
                 "source_path": dati_progetto["input_path"],
                 "img_w": model.larghezza_originale,
@@ -121,6 +124,7 @@ class AppController(QObject):
                 nome=dati_progetto["name"],
                 tipo="whole_image",
                 parametri=parametri,
+                classi_etichette=classi_scelte,
                 setup_model=model
             )
         else:
@@ -161,7 +165,7 @@ class AppController(QObject):
     # CREAZIONE FISICA DEL PROGETTO (JSON)
     # ==========================================
 
-    def flusso_avvia_etichettatura(self, cartella_destinazione, nome, tipo, parametri, setup_model):
+    def flusso_avvia_etichettatura(self, cartella_destinazione, nome, tipo, parametri, setup_model, classi_etichette):
         """
         Assembla i dati calcolati e genera fisicamente la struttura di cartelle e il JSON
         """
@@ -193,6 +197,7 @@ class AppController(QObject):
                 tipo_sorgente=tipo,
                 parametri_setup=parametri,
                 dati_patch=dati_patch,
+                classi_etichette=classi_etichette,
                 callback_ui=aggiorna_ui
             )
 

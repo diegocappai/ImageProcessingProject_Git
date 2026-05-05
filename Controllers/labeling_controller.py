@@ -10,15 +10,20 @@ class EtichettaturaController:
         self.model = project_manager
         self.view = view
 
+        classi_salvate = self.model.data["labeling_config"]["classes"]
         # =============================================================
         # DIPENDENZE
         # =============================================================
         self.naviga_alla_dashboard = None
 
+
         # =============================================================
         # STATO DEL CONTROLLER
         # =============================================================
         self.lista_patch = self.model.data.get("patches", [])
+        classi_salvate = self.model.data["labeling_config"]["classes"]
+        self.view.imposta_etichette_da_json(classi_salvate)
+
 
         # Filtriamo in memoria solo le patch eleggibili per la revisione
         self.patches_da_mostrare = [p for p in self.lista_patch if p.get("is_sampled", False)]
@@ -67,6 +72,8 @@ class EtichettaturaController:
 
         # Intercetta il click su qualsiasi RadioButton che rappresenta un'etichetta
         self.view.etichetta_selezionata.connect(self.gestisci_etichettatura)
+
+
 
     # ==========================================
     # LOGICA DI NAVIGAZIONE E STATO

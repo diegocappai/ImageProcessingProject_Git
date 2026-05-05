@@ -17,13 +17,9 @@ class ImageManager(ABC):
         # Dato un nome file o coord resituisce oggetto patch
         pass
 
-    """@abstractmethod
-    def extract_iterator_patches(self, method):
-        pass
-    """
 
     def is_patch_valid(self, patch, min_tissue_percent=0.5):
-        # Controlla se la patch reale contiene abbastanza tessuto.
+        # Controlla se la patch reale contiene abbastanza tessuto
         # min_tissue_percent: Percentuale minima di tessuto richiesta
 
         # Converte in sRGB

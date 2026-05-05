@@ -70,11 +70,6 @@ QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
     border: 1px solid #4b8bcf; /* Bordo azzurro quando ci clicchi dentro */
 }
 
-/* --- Radio buttons --- */
-QRadioButton::indicator:checked {
-    background-color: #4b8bcf;
-    border: 2px solid #4b8bcf;
-}
 
 /* --- Etichette Titolo (Riutilizzabile in varie View) --- */
 QLabel[class="SectionTitle"] {
@@ -144,23 +139,6 @@ QPushButton[class="MenuDropdownBtn"]:hover {
     border-radius: 4px;
 }
 
-/* Radio Button "Da rivedere" */
-QRadioButton[class="ReviewRadio"] {
-    color: white;
-    font-style: italic;
-    font-size: 13px;
-}
-QRadioButton[class="ReviewRadio"]::indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 8px;
-    border: 2px solid #777777;
-    background-color: #2d2d30;
-}
-QRadioButton[class="ReviewRadio"]::indicator:checked {
-    border: 2px solid white;
-    background-color: #2ca02c; /* Verde brillante professionale */
-}
 
 /* Bottoni di Navigazione (Precedente/Successivo) */
 QPushButton[class="NavButton"] {
@@ -291,28 +269,6 @@ QProgressBar::chunk {
 /* =========================================
    VISTA IMPOSTAZIONI SLIDE & ROI
    ========================================= */
-
-/* CheckBox Globale (Sostituisce il pallino standard con un quadrato elegante) */
-QCheckBox {
-    color: #f0f0f0;
-    font-size: 13px;
-    spacing: 8px;
-}
-QCheckBox::indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 2px;
-    border: 2px solid #555555;
-    background-color: #1e1e1e;
-}
-QCheckBox::indicator:hover {
-    border: 2px solid #888888;
-    background-color: #2a2a2a;
-}
-QCheckBox::indicator:checked {
-    border: 2px solid #4b8bcf;
-    background-color: #4b8bcf;
-}
 
 /* Label Istruzioni e Highlight */
 QLabel[class="InstructionLabel"] { color: #aaaaaa; font-size: 11px; }

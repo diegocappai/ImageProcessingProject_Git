@@ -31,6 +31,7 @@ class RoiGraphicsView(QGraphicsView):
         self.drawing = False
         self.start_point = None
         self.current_rect_item = None
+        self.last_valid_rect = None
         self.roi_items = []
 
         self.panning = False
@@ -99,6 +100,7 @@ class RoiGraphicsView(QGraphicsView):
             # Mappiamo le coordinate hardware del mouse sulla scena virtuale
             self.start_point = self.mapToScene(event.position().toPoint())
 
+            self.last_valid_rect = QRectF(self.start_point, self.start_point)
             self.current_rect_item = QGraphicsRectItem()
 
             # Stile della nuova ROI
@@ -128,9 +130,22 @@ class RoiGraphicsView(QGraphicsView):
         elif self.drawing and self.current_rect_item:
             current_point = self.mapToScene(event.position().toPoint())
 
-            # normalized() garantisce che la ROI esista anche se disegno "al contrario" (da in basso a destra verso in alto a sinistra)
-            rect = QRectF(self.start_point, current_point).normalized()
-            self.current_rect_item.setRect(rect)
+            rect_proposto = QRectF(self.start_point, current_point).normalized()
+            rect_proposto = rect_proposto.intersected(self.sceneRect())
+
+            collisione = False
+            for roi_esistente in self.roi_items:
+                if rect_proposto.intersects(roi_esistente.rect()):
+                    collisione = True
+                    break
+
+            if not collisione:
+                self.last_valid_rect = rect_proposto
+                self.current_rect_item.setRect(rect_proposto)
+            else:
+                self.current_rect_item.setRect(self.last_valid_rect)
+
+
             event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -227,6 +242,10 @@ class RoiGraphicsView(QGraphicsView):
         if self.grid_step_x * livello_zoom < 4:
             return
 
+        rect_disegno = rect.intersected(self.sceneRect())
+        if rect_disegno.isEmpty():
+            return
+
         # Stile della griglia
         pen = QPen(QColor(0, 255, 0, 180))
         pen.setWidth(2)
@@ -235,8 +254,8 @@ class RoiGraphicsView(QGraphicsView):
         painter.setPen(pen)
 
         # Delimitazione dell'area visibile
-        left, right = int(rect.left()), int(rect.right())
-        top, bottom = int(rect.top()), int(rect.bottom())
+        left, right = int(rect_disegno.left()), int(rect_disegno.right())
+        top, bottom = int(rect_disegno.top()), int(rect_disegno.bottom())
 
         # Matematica Modulare: trova la prima coordinata della griglia che cade nell'area visibile
         start_x = left - ((left - self.grid_offset_x) % self.grid_step_x)
@@ -246,12 +265,12 @@ class RoiGraphicsView(QGraphicsView):
         lines = []
 
         x = start_x
-        while x < right:
+        while x <= right:
             lines.append(QLineF(x, top, x, bottom))
             x += self.grid_step_x
 
         y = start_y
-        while y < bottom:
+        while y <= bottom:
             lines.append(QLineF(left, y, right, y))
             y += self.grid_step_y
 

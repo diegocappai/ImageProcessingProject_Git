@@ -126,8 +126,7 @@ class ProjectManager:
     # ==========================================
     # CREAZIONE E MANIPOLAZIONE DATI
     # ==========================================
-    def crea_nuovo_progetto(self, cartella_destinazione, nome_progetto, tipo_sorgente, parametri_setup, dati_patch,
-                            callback_ui=None):
+    def crea_nuovo_progetto(self, cartella_destinazione, nome_progetto, tipo_sorgente, parametri_setup, classi_etichette, dati_patch, callback_ui=None):
         """
         Costruisce l'intero JSON del progetto
         """
@@ -178,6 +177,9 @@ class ProjectManager:
                 "roi_list": parametri_setup.get("roi_reali", []),
                 "sampling_percentage": percentuale,
                 "sampling_strategy": ordine.lower()
+            },
+            "labeling_config": {
+              "classes": classi_etichette
             },
             "progress": {
                 "total_patches": len(pool_attivi),

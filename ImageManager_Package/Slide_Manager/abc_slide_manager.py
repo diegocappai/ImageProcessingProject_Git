@@ -79,7 +79,7 @@ class SlideManager(ImageManager, ABC):
         coords = [i * tile_size for i in range(num_patches)]
         return coords
 
-    def get_tissue_coords(self, target_dim=1024, tissue_coverage=0.1):
+    def get_tissue_coords(self, target_dim=1024, tissue_coverage=0.3):
         """
         Algoritmo di segmentazione del tessuto (Otsu Thresholding su spazio HSV):
         Analizza un'anteprima dell'immagine e proietta i risultati sulla scala reale
