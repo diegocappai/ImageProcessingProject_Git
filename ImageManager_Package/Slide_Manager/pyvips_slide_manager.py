@@ -115,12 +115,11 @@ class VipsSlideManager(SlideManager):
         # PADDING
         # Se la porzione che abbiamo ritagliato è più piccola della grandezza target
         if w_sicura < w or h_sicura < h:
-            # embed: posiziona la nostra patch alle coordinate (0,0) di un nuovo canvas grande (target_w, target_h)
-            # extend='background' riempie lo spazio vuoto rimanente con il colore di background.
+            # posiziona la nostra patch alle coordinate (0,0) di un nuovo canvas grande (target_w, target_h)
             patch = patch.embed(
                 0, 0, w, h,
                 extend='background',
-                background=[255, 255, 255]  # [R, G, B] Sfondo bianco, tipico dei vetrini vuoti
+                background=[255, 255, 255]
             )
 
         return patch

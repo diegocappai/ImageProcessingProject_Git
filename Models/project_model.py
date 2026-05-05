@@ -48,25 +48,30 @@ class ProjectManager:
     @staticmethod
     def genera_indici_campionamento(totale_patch, percentuale, modalita="Random"):
         """
-        Algoritmo di Subset Selection.
-        In base ai parametri dell'utente, decide QUALI patch dovranno essere
-        effettivamente mostrate al medico durante la fase di etichettatura.
+        Genera gli indici delle patch da mostrare
         """
         if totale_patch == 0:
             return []
 
-        numero_da_tenere = max(1, int(totale_patch * (percentuale / 100.0)))
+        if percentuale >= 100:
+            indici = list(range(totale_patch))
+            if modalita == "Random":
+                random.shuffle(indici)
+            return indici
 
-        # Paracadute matematico
-        if numero_da_tenere >= totale_patch:
-            return list(range(totale_patch))
+        numero_indici = max(1, int(totale_patch * (percentuale / 100.0)))
 
-        indici = list(range(totale_patch))
+        # CAMPIONAMENTO
+        indici_scelti = random.sample(range(totale_patch), numero_indici)
 
-        if modalita == "Random":
-            return random.sample(indici, numero_da_tenere)
+        # ORDINAMENTO
+        if modalita == "Sequential":
+            indici_scelti.sort()
         else:
-            return indici[:numero_da_tenere]
+            random.shuffle(indici_scelti)
+
+        return indici_scelti
+
 
     # ==========================================
     # OPERAZIONI DI I/O SU DISCO

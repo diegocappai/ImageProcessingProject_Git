@@ -25,7 +25,6 @@ class DatasetManager(ImageManager, ABC):
     def extract_iterator_patches(self, method):
         patch_list = self.get_items()
 
-        # TODO Valutare se necassari random/sequential
         if method == 'random':
             random.shuffle(patch_list)
         elif method == 'sequential':
@@ -35,5 +34,4 @@ class DatasetManager(ImageManager, ABC):
 
         for file_name in patch_list:
             patch = self.extract_patch(file_name)
-            # TODO Ragionare su output metodo
             yield patch, file_name
