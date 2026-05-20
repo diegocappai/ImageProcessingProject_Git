@@ -20,7 +20,7 @@ def main():
     app.setApplicationName("Image Processing Project")
     app.setApplicationVersion("1.0.0")
 
-    qss_path = resource_path("Interface_Package/assets/qss.qss")
+    qss_path = resource_path("Interface_Package/assets/style.qss")
 
     if os.path.exists(qss_path):
         with open(qss_path, "r", encoding="utf-8") as file:
