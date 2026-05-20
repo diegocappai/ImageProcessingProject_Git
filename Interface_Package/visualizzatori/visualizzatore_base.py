@@ -94,9 +94,9 @@ class VisualizzatoreBase(QScrollArea):
         view_h = self.viewport().height() if self.viewport().height() > 0 else 600
 
         ratio = min(view_w / self.original_pixmap.width(),
-                    view_h / self.original_pixmap.height()) * 0.95
+                    view_h / self.original_pixmap.height()) * 0.99
 
-        self.scale_factor = min(ratio, 1.0)  # Mai ingrandire inizialmente se l'immagine è piccola
+        self.scale_factor = ratio
 
     def aggiorna_visualizzazione(self):
         """

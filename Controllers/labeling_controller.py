@@ -1,47 +1,97 @@
+import random
 from ImageManager_Package import get_manager
+from PySide6.QtWidgets import QMessageBox, QApplication
+from PySide6.QtGui import QPainter, QColor, QBrush, QPen, Qt
+from PySide6.QtCore import QRect, Qt
+from collections import deque
+from Utils.ui_settings import PALETTE_COLORI
+from Utils.pyvips_to_qpixmap import pyvips_to_qpixmap
 
 
 class EtichettaturaController:
-    """
-    Controller per l'interfaccia di annotazione
-    """
 
-    def __init__(self, project_manager, view):
-        self.model = project_manager
+    def __init__(self, project_manager, view, roi_selezionate=None, patch_selezionate=None):
+        self.model = project_manager  # Usiamo 'model' per coerenza
         self.view = view
-
-        classi_salvate = self.model.data["labeling_config"]["classes"]
-        # =============================================================
-        # DIPENDENZE
-        # =============================================================
+        self.roi_selezionate = roi_selezionate
+        self.patch_selezionate = patch_selezionate
         self.naviga_alla_dashboard = None
-
-
-        # =============================================================
-        # STATO DEL CONTROLLER
-        # =============================================================
-        self.lista_patch = self.model.data.get("patches", [])
-        classi_salvate = self.model.data["labeling_config"]["classes"]
-        self.view.imposta_etichette_da_json(classi_salvate)
-
-
-        # Filtriamo in memoria solo le patch eleggibili per la revisione
-        self.patches_da_mostrare = [p for p in self.lista_patch if p.get("is_sampled", False)]
+        self.patches_da_mostrare = []
         self.indice_corrente = 0
+        self.image_manager = None
 
-        # Posiziona l'utente sull'ultima patch non ancora vista
-        self.trova_punto_di_ripresa()
+        self.is_slide_source = self.model.data.get("source_type") in ["whole_image"]
+        self._inizializza_sessione()
 
-        # Inizializza il lettore di immagini
-        self._inizializza_image_manager()
+        # Se ci sono dati, continuiamo con l'inizializzazione dei motori
+        if self.patches_da_mostrare:
+            self.history_queue = deque(maxlen=10)
+            self.current_patch_pixmap = None
+            self.trova_punto_di_ripresa()
+            self._inizializza_image_manager()
+            self._ripristina_cronologia_sessione()
+            self.collega_segnali()
+            self.aggiorna_vista()
 
-        self.collega_segnali()
-        self.aggiorna_vista()
+
+    def _inizializza_sessione(self):
+        """Prepara l'interfaccia e filtra le patch da etichettare"""
+        classi_salvate = self.model.data["labeling_config"]["classes"]
+
+        color_map_history = {
+            classe: PALETTE_COLORI[i % len(PALETTE_COLORI)]
+            for i, classe in enumerate(classi_salvate)
+        }
+        self.view.imposta_etichette_da_json(classi_salvate, color_map_history)
+
+        tutte_le_patch = self.model.data.get("patches", [])
+        self.patches_da_mostrare = []
+
+        #  Slide vs Cartella
+        if self.is_slide_source:
+            if self.patch_selezionate:
+                self.patches_da_mostrare = [p for p in tutte_le_patch if p.get("patch_id") in self.patch_selezionate]
+                self.patches_da_mostrare.sort(key=lambda p: (p.get("y", 0), p.get("x",0)))
+            else:
+                lista_config_roi = self.model.data.get("sampling_config", {}).get("roi_list", [])
+                rois_da_processare = self.roi_selezionate or [r["id"] for r in lista_config_roi]
+
+                for roi_id in rois_da_processare:
+                    roi_info = next((r for r in lista_config_roi if r["id"] == roi_id), {})
+                    ordine = roi_info.get("show_order", "sequential")
+
+                    patch_della_roi = [p for p in tutte_le_patch if p.get("is_sampled") and p.get("roi_id") == roi_id]
+                    if not patch_della_roi:
+                        continue
+
+                    patch_della_roi.sort(key=lambda p: (p.get("y", 0), p.get("x", 0)))
+                    if ordine.lower() == "random":
+                        random.Random(roi_id).shuffle(patch_della_roi)
+
+                    self.patches_da_mostrare.extend(patch_della_roi)
+
+        else:
+            self.patches_da_mostrare = [
+                p for p in tutte_le_patch
+                if isinstance(p, dict) and p.get("is_sampled", True) is not False
+            ]
+
+            # Applichiamo l'ordinamento (Sequenziale o Random)
+            ordine = self.model.data.get("sampling_config", {}).get("ordine", "sequential")
+            if "rand" in ordine.lower():
+                random.shuffle(self.patches_da_mostrare)
+            else:
+                self.patches_da_mostrare.sort(key=lambda p: str(p.get("file_name") or p.get("patch_id") or ""))
+
+        # Controllo Sicurezza
+        if not self.patches_da_mostrare:
+            QMessageBox.information(self.view, "Sessione Completata",
+                                    "Non ci sono patch da etichettare per la selezione attuale.")
+            if self.naviga_alla_dashboard:
+                self.naviga_alla_dashboard()
 
     def _inizializza_image_manager(self):
-        """
-        Legge i metadati dal JSON e crea il Manager di immagini appropriato
-        """
+        """Legge i metadati dal JSON e istanzia il Manager"""
         percorso_base = self.model.data.get("source_path", "")
         tipo_sorgente = self.model.data.get("source_type", "")
 
@@ -49,10 +99,8 @@ class EtichettaturaController:
             print("[DEBUG - ERROR] Etichettatura: Percorso sorgente mancante nel JSON.")
             return
 
-        # Supporto retrocompatibile
         if tipo_sorgente in ["patch_folder", "Folder"]:
             self.image_manager = get_manager(method='Folder', input_path=percorso_base)
-            print("[DEBUG] Inizializzato manager Folder per etichettatura")
 
         elif tipo_sorgente in ["whole_image", "Slide"]:
             dimensione_patch = self.model.data.get("patching_config", {}).get("patch_size", 512)
@@ -62,164 +110,434 @@ class EtichettaturaController:
                 tile_w=dimensione_patch,
                 tile_h=dimensione_patch
             )
-            print("[DEBUG] Inizializzato manager Slide (WSI) per l'etichettatura.")
+
+    def _ripristina_cronologia_sessione(self):
+        """
+        Recupera le ultime patch etichettate dal JSON (basandosi sul tempo di revisione)
+        e le inserisce nella history per mantenere il contesto visivo.
+        """
+        # Filtriamo solo le patch che sono già state etichettate nel set corrente
+        gia_etichettate = [
+            p for p in self.patches_da_mostrare
+            if p.get("status") == "labeled" and p.get("reviewed_at")  #
+        ]
+
+        if not gia_etichettate:
+            return
+
+        # Ordiniamo per data di revisione (dalla più vecchia alla più recente)
+        gia_etichettate.sort(key=lambda p: p["reviewed_at"])
+
+        ultime_patch = gia_etichettate[-10:]
+
+        for patch in ultime_patch:
+            try:
+                if self.is_slide_source:
+                    vips_image = self.image_manager.extract_patch(
+                        (patch["x"], patch["y"], patch["width"], patch["height"]))
+                else:
+                    vips_image = self.image_manager.extract_patch(patch["file_name"])
+
+                dim_thumb = 150
+                if vips_image.width > dim_thumb or vips_image.height > dim_thumb:
+                    try:
+                        vips_image = vips_image.thumbnail_image(dim_thumb)
+                    except AttributeError:
+                        scala = dim_thumb / max(vips_image.width, vips_image.height)
+                        vips_image = vips_image.resize(scala)
+
+                thumb_pixmap = pyvips_to_qpixmap(vips_image)
+                del vips_image
+
+                nome_etichetta = patch.get("label")
+                colore_hex = self.view.color_map.get(nome_etichetta, "#0078d7")
+                patch_id = patch.get("patch_id")
+
+                self.history_queue.appendleft((patch_id, thumb_pixmap, nome_etichetta, colore_hex))
+
+            except Exception as e:
+                print(f"[DEBUG - WARNING] Impossibile ripristinare patch {patch.get('patch_id')} in history: {e}")
+
+        if self.history_queue:
+            dati_per_view = list(self.history_queue)
+            self.view.aggiorna_cronologia(dati_per_view)
 
     def collega_segnali(self):
         """Collega gli eventi generati dall'utente ai metodi del Controller"""
         self.view.richiesta_indietro.connect(self.vai_indietro)
         self.view.richiesta_avanti.connect(self.vai_avanti)
-        self.view.btn_salva.clicked.connect(self.salva_ed_esci)
-
-        # Intercetta il click su qualsiasi RadioButton che rappresenta un'etichetta
+        self.view.btn_dashboard.clicked.connect(self.salva_ed_esci)
         self.view.etichetta_selezionata.connect(self.gestisci_etichettatura)
+        self.view.richiesta_salto.connect(self.vai_a_patch_specifica)
+        self.view.richiesta_contesto.connect(self._gestisci_zoom_contesto)
+        self.view.richiesta_rimozione_etichetta.connect(self.rimuovi_etichetta)
+        self.view.combo_filtri.currentIndexChanged.connect(self._al_cambio_filtro)
 
+    def _al_cambio_filtro(self, index):
+        """Scatta quando l'utente cambia voce nel menù a tendina"""
+        self.salva_patch_attuale()
 
+        # Contiamo se ci sono patch valide con il nuovo filtro
+        patch_valide = sum(1 for p in self.patches_da_mostrare if self._is_patch_valida(p))
+
+        if patch_valide == 0 and index != 0:
+            QMessageBox.warning(self.view, "Attenzione", "Nessuna patch soddisfa questo filtro nella sessione attuale.")
+            self.view.combo_filtri.blockSignals(True)
+            self.view.combo_filtri.setCurrentIndex(0)
+            self.view.combo_filtri.blockSignals(False)
+            self._aggiorna_contatore_e_bottoni()
+            return
+
+        # Saltiamo alla prima patch valida trovata
+        for i, p in enumerate(self.patches_da_mostrare):
+            if self._is_patch_valida(p):
+                self.indice_corrente = i
+                break
+
+        self.aggiorna_vista()
 
     # ==========================================
     # LOGICA DI NAVIGAZIONE E STATO
     # ==========================================
     def trova_punto_di_ripresa(self):
-        """
-        Analizza la lista filtrata e imposta l'indice sulla prima patch che non ha il flag 'shown_to_user = True'
-        """
+        """Imposta l'indice sull'ultima patch mostrata del set filtrato, se la sessione è nuova parte dalla patch con indice 0"""
         for i, patch in enumerate(self.patches_da_mostrare):
             if not patch.get("shown_to_user", False):
-                self.indice_corrente = i
+                self.indice_corrente = max(0, i - 1)
                 return
         self.indice_corrente = 0
 
-    def ottieni_patch_corrente(self):
-        """Restituisce il dizionario della patch mostrata a schermo"""
-        if not self.patches_da_mostrare:
-            return None
-        return self.patches_da_mostrare[self.indice_corrente]
+    def _is_patch_valida(self, patch):
+        """Motore di calcolo: verifica se una patch sopravvive al filtro del ComboBox"""
+        filtro = self.view.combo_filtri.currentIndex()
 
-    def aggiorna_vista(self):
-        """
-        Sincronizza l'Interfaccia Grafica con lo stato del Model in corrispondenza della patch corrente
-        """
-        patch_corrente = self.ottieni_patch_corrente()
-        if not patch_corrente:
+        if filtro == 1 and patch.get("shown_to_user", False): return False
+        if filtro == 2 and patch.get("label"): return False
+        if filtro == 3 and not patch.get("selected_for_review", False): return False
+
+        return True
+
+    def _aggiorna_contatore_e_bottoni(self):
+        """Calcola dinamicamente la posizione relativa in base ai filtri accesi"""
+        # Estraiamo gli indici assoluti di tutte le patch valide
+        indici_validi = [i for i, p in enumerate(self.patches_da_mostrare) if self._is_patch_valida(p)]
+        totale_valide = len(indici_validi)
+
+        filtri_attivi = self.view.combo_filtri.currentIndex() > 0
+
+        if totale_valide == 0:
+            self.view.label_counter.setText("0 di 0")
+            self.view.btn_prev.setEnabled(False)
+            self.view.btn_next.setEnabled(False)
             return
 
-        totale_da_mostrare = len(self.patches_da_mostrare)
+        if self.indice_corrente in indici_validi:
+            pos_relativa = indici_validi.index(self.indice_corrente)
+
+            testo = f"{pos_relativa + 1} di {totale_valide}"
+            if filtri_attivi:
+                testo += " (Filtrate)"
+
+            self.view.label_counter.setText(testo)
+            self.view.btn_prev.setEnabled(pos_relativa > 0)
+            self.view.btn_next.setEnabled(pos_relativa < totale_valide - 1)
+
+        else:
+            testo = f"- di {totale_valide}"
+            if filtri_attivi:
+                testo += " (Filtrate)"
+
+            self.view.label_counter.setText(testo)
+            self.view.btn_prev.setEnabled(any(i < self.indice_corrente for i in indici_validi))
+            self.view.btn_next.setEnabled(any(i > self.indice_corrente for i in indici_validi))
+
+    def ottieni_patch_corrente(self):
+        """Restituisce il dizionario della patch mostrata a schermo"""
+        return self.patches_da_mostrare[self.indice_corrente] if self.patches_da_mostrare else None
+
+    def aggiorna_vista(self):
+        """Sincronizza l'Interfaccia Grafica con lo stato del Model"""
+        patch = self.ottieni_patch_corrente()
+        if not patch:
+            return
+
+        self._aggiorna_contatore_e_bottoni()
 
         self.view.radio_rivedere.blockSignals(True)
         self.view.text_note.blockSignals(True)
         self.view.gruppo_etichette.blockSignals(True)
 
-        self.view.label_counter.setText(f"{self.indice_corrente + 1} di {totale_da_mostrare}")
-        self.view.aggiorna_stato_navigazione(self.indice_corrente, totale_da_mostrare)
-
-        note_salvate = patch_corrente.get("annotation_text", "")
-        self.view.text_note.setPlainText(note_salvate if note_salvate else "")
-
-        da_rivedere = patch_corrente.get("selected_for_review", False)
-        self.view.radio_rivedere.setChecked(da_rivedere)
-
-        # Ripristino visivo dell'etichetta (se già assegnata)
-        etichetta_salvata = patch_corrente.get("label")
-        self.view.gruppo_etichette.setExclusive(False)
-        for btn in self.view.gruppo_etichette.buttons():
-            btn.setChecked(btn.text() == etichetta_salvata)
-        self.view.gruppo_etichette.setExclusive(True)
+        self.view.text_note.setPlainText(patch.get("annotation_text", ""))
+        self.view.radio_rivedere.setChecked(patch.get("selected_for_review", False))
+        self.view.mostra_etichetta_selezionata(patch.get("label"))
 
         self.view.radio_rivedere.blockSignals(False)
         self.view.text_note.blockSignals(False)
         self.view.gruppo_etichette.blockSignals(False)
 
-        # Estrazione dell'immagine
+        self.current_patch_pixmap = None
+        import gc
+        gc.collect()
+
         try:
-            if self.model.data.get("source_type") in ["patch_folder", "Folder"]:
-                nome_file = patch_corrente.get("file_name")
-                vips_image = self.image_manager.extract_patch(nome_file)
+            if self.is_slide_source:
+                vips_image = self.image_manager.extract_patch((patch["x"], patch["y"], patch["width"], patch["height"]))
             else:
-                x = patch_corrente.get("x")
-                y = patch_corrente.get("y")
-                w = patch_corrente.get("width")
-                h = patch_corrente.get("height")
+                vips_image = self.image_manager.extract_patch(patch["file_name"])
 
-                if x is None or y is None or w is None or h is None:
-                    raise ValueError(f"Coordinate mancanti per la patch {patch_corrente.get('patch_id')}")
+            max_dim_schermo = 2048
+            if vips_image.width > max_dim_schermo or vips_image.height > max_dim_schermo:
+                try:
+                    vips_image = vips_image.thumbnail_image(max_dim_schermo)
+                except AttributeError:
+                    scala = max_dim_schermo / max(vips_image.width, vips_image.height)
+                    vips_image = vips_image.resize(scala)
 
-                vips_image = self.image_manager.extract_patch((int(x), int(y), int(w), int(h)))
+            pixmap_estratto = pyvips_to_qpixmap(vips_image)
+            self.current_patch_pixmap = pixmap_estratto
+            self.view.carica_immagine(pixmap_estratto)
 
-            # Rendering: Converte da Vips Image a Qt Pixmap
-            from Utils.pyvips_to_qpixmap import pyvips_to_qpixmap
-            pixmap = pyvips_to_qpixmap(vips_image)
-            self.view.carica_immagine(pixmap)
+            del vips_image
+            gc.collect()
 
         except Exception as e:
-            print(f"[DEBUG - ERROR] Estrazione/Conversione Immagine fallita: {e}")
-            return
+            print(f"[ERROR] Estrazione fallita: {e}")
 
-        # Registriamo nel Model che l'utente ha visto questa patch
-        patch_corrente["shown_to_user"] = True
+        if not patch.get("shown_to_user", False):
+
+            patch["shown_to_user"] = True
+
+            if self.is_slide_source:
+                roi_id_della_patch = patch.get("roi_id")
+                if roi_id_della_patch:
+                    lista_roi = self.model.data.get("sampling_config", {}).get("roi_list", [])
+                    for roi in lista_roi:
+                        if roi.get("id") == roi_id_della_patch:
+                            stats = roi.setdefault("stats", {})
+                            stats["shown_to_user"] = stats.get("shown_to_user", 0) + 1
+                            break
+
+            if hasattr(self.model, "salva_su_disco"):
+                self.model.salva_su_disco()
 
     def salva_patch_attuale(self):
-        """
-        Legge lo stato attuale della User Interface e sovrascrive i dati della patch nel Model
-        """
+        """Sovrascrive i dati della patch nel Model"""
         patch = self.ottieni_patch_corrente()
         if not patch:
             return
 
-        # Recupero Dati
-        note_da_ui = self.view.text_note.toPlainText()
-        da_rivedere_da_ui = self.view.radio_rivedere.isChecked()
-
-        label_selezionata = None
-        bottone_premuto = self.view.gruppo_etichette.checkedButton()
-        if bottone_premuto:
-            label_selezionata = bottone_premuto.text()
-
-        # Aggiornamento tramite ProjectManager
         self.model.aggiorna_patch(
             patch_id=patch["patch_id"],
-            label=label_selezionata,
-            note=note_da_ui,
-            da_rivedere=da_rivedere_da_ui
+            label=self.view.get_etichetta_attiva(),
+            note=self.view.text_note.toPlainText(),
+            da_rivedere=self.view.radio_rivedere.isChecked()
         )
-        print(f"[DEBUG] Dati patch '{patch['patch_id']}' aggiornati su disco.")
 
-    # ==========================================
-    # AZIONI UTENTE
+    def _gestisci_zoom_contesto(self, attivo: bool):
+        """Mostra il contesto in tempo reale blindando la memoria."""
+        patch_centrale = self.ottieni_patch_corrente()
+        if not patch_centrale or not self.is_slide_source:
+            return
+
+        if not attivo:
+            self.view.image_viewer.mostra_immagine(self.current_patch_pixmap)
+            import gc
+            gc.collect()
+            return
+
+        QApplication.processEvents()
+
+        try:
+            w, h = patch_centrale["width"], patch_centrale["height"]
+            patches = self.model.data.get("patches", [])
+            if not patches:
+                return
+
+            ext_w = w * 3
+            ext_h = h * 3
+
+            ctx_x = patch_centrale["x"] - w
+            ctx_y = patch_centrale["y"] - h
+
+            max_x_slide = max(p.get("x", 0) + p.get("width", 0) for p in patches)
+            max_y_slide = max(p.get("y", 0) + p.get("height", 0) for p in patches)
+
+            ext_x = max(0, min(ctx_x, max_x_slide - ext_w))
+            ext_y = max(0, min(ctx_y, max_y_slide - ext_h))
+
+            vips_image = self.image_manager.extract_patch(
+                (ext_x, ext_y, ext_w, ext_h),
+                target_size=2048
+            )
+
+            fattore_scala = vips_image.width / ext_w
+
+            pixmap_contesto = pyvips_to_qpixmap(vips_image)
+            del vips_image
+
+            painter = QPainter(pixmap_contesto)
+
+            for p in patches:
+                if (ext_x <= p["x"] < ext_x + ext_w and
+                        ext_y <= p["y"] < ext_y + ext_h):
+
+                    local_x = int((p["x"] - ext_x) * fattore_scala)
+                    local_y = int((p["y"] - ext_y) * fattore_scala)
+                    rect_w = int(p["width"] * fattore_scala)
+                    rect_h = int(p["height"] * fattore_scala)
+
+                    rect_patch = QRect(local_x, local_y, rect_w, rect_h)
+
+                    if p["patch_id"] == patch_centrale["patch_id"]:
+                        pen = QPen(QColor(255, 255, 0))
+                        pen.setWidth(max(2, int(4 * fattore_scala)))
+                        painter.setPen(pen)
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        painter.drawRect(rect_patch)
+
+                    elif p.get("label"):
+                        colore_hex = self.view.color_map.get(p["label"], "#0078d7")
+                        colore = QColor(colore_hex)
+                        colore.setAlpha(80)
+
+                        painter.setPen(Qt.PenStyle.NoPen)
+                        painter.setBrush(QBrush(colore))
+                        painter.drawRect(rect_patch)
+
+            painter.end()
+            self.view.image_viewer.mostra_immagine(pixmap_contesto)
+
+        except Exception as e:
+            print(f"[ERROR] Zoom contesto fallito: {e}")
     # ==========================================
 
     def vai_avanti(self):
-        """Salva lo stato corrente e avanza l'indice"""
         self.salva_patch_attuale()
 
-        if self.indice_corrente < len(self.patches_da_mostrare) - 1:
-            self.indice_corrente += 1
+        step = 1
+        while self.indice_corrente + step < len(self.patches_da_mostrare):
+            next_index = self.indice_corrente + step
+            next_patch = self.patches_da_mostrare[next_index]
+
+            if not self._is_patch_valida(next_patch):
+                step += 1
+                continue
+
+            self.indice_corrente = next_index
             self.aggiorna_vista()
-
-    def vai_indietro(self):
-        """Salva lo stato corrente e arretra l'indice"""
-        self.salva_patch_attuale()
-
-        if self.indice_corrente > 0:
-            self.indice_corrente -= 1
-            self.aggiorna_vista()
-
-    def gestisci_etichettatura(self, nome_etichetta):
-        """Slot chiamato al click di un RadioButton (Automatizza l'avanzamento)"""
-        if not self.lista_patch:
             return
 
-        print(f"[DEBUG] Selezionata etichetta '{nome_etichetta}', trigger automatico avanti.")
-        self.vai_avanti()
-
-    def salva_ed_esci(self):
-        """Salva lo stato e naviga verso la Dashboard"""
+    def vai_indietro(self):
         self.salva_patch_attuale()
 
-        # Sincronizza eventuali altri metadati pendenti
-        self.model.salva_su_disco()
-        print("[DEBUG] Progressi salvati. Uscita da Etichettatura.")
+        step = 1
+        while self.indice_corrente - step >= 0:
+            next_index = self.indice_corrente - step
+            next_patch = self.patches_da_mostrare[next_index]
 
-        # Routing sicuro al MainController
+            if not self._is_patch_valida(next_patch):
+                step += 1
+                continue
+
+            self.indice_corrente = next_index
+            self.aggiorna_vista()
+
+            return
+
+    def vai_a_patch_specifica(self, patch_id):
+        """Cerca la patch nella lista e sposta l'indice corrente"""
+        # Salviamo la patch attuale prima di spostarci
+        self.salva_patch_attuale()
+
+        for i, p in enumerate(self.patches_da_mostrare):
+            if p.get("patch_id") == patch_id:
+                self.indice_corrente = i
+                self.aggiorna_vista()
+                return
+
+    def gestisci_etichettatura(self, nome_etichetta, da_shortcut=False):
+        patch_corrente = self.ottieni_patch_corrente()
+        if not patch_corrente:
+            return
+
+        if patch_corrente.get("label") == nome_etichetta:
+            if da_shortcut:
+                pass  # La tastiera conferma sempre, non cancella
+            else:
+                self.rimuovi_etichetta()
+                return
+
+        self.view.mostra_etichetta_selezionata(nome_etichetta)
+
+        patch_corrente["status"] = "labeled"
+        import datetime
+        patch_corrente["reviewed_at"] = datetime.datetime.now().isoformat()
+
+        if self.current_patch_pixmap:
+            colore_hex = self.view.color_map.get(nome_etichetta, "#0078d7")
+            patch_id = patch_corrente.get("patch_id")
+
+            elemento_esistente = next((item for item in self.history_queue if item[0] == patch_id), None)
+            if elemento_esistente:
+                self.history_queue.remove(elemento_esistente)
+
+            thumb_pixmap = self.current_patch_pixmap.scaled(
+                150,150,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+
+            self.history_queue.appendleft((patch_id, thumb_pixmap, nome_etichetta, colore_hex))
+
+            if hasattr(self.view, 'aggiorna_cronologia'):
+                dati_per_view = [(pid, pixmap, nome, colore) for pid, pixmap, nome, colore in self.history_queue]
+                self.view.aggiorna_cronologia(dati_per_view)
+
+        is_ultima_patch = (self.indice_corrente == len(self.patches_da_mostrare) - 1)
+
+        if is_ultima_patch:
+            self.salva_patch_attuale()
+            self.aggiorna_vista()
+
+            torna_a_dashboard = self.view.mostra_avviso_fine_sessione()
+            if torna_a_dashboard:
+                self.salva_ed_esci()
+        else:
+            self.vai_avanti()
+
+    def rimuovi_etichetta(self):
+        patch_corrente = self.ottieni_patch_corrente()
+        if not patch_corrente or "label" not in patch_corrente:
+            return
+
+        patch_corrente.pop("label", None)
+        patch_corrente.pop("reviewed_at", None)
+        patch_corrente["status"] = "skipped"
+
+        self.model.aggiorna_patch(
+            patch_id=patch_corrente["patch_id"],
+            label=None,
+            note=self.view.text_note.toPlainText(),
+            da_rivedere=self.view.radio_rivedere.isChecked()
+        )
+
+        # Salviamo fisicamente il JSON
+        if hasattr(self.model, "salva_su_disco"):
+            self.model.salva_su_disco()
+
+        patch_id = patch_corrente.get("patch_id")
+        elemento_esistente = next((item for item in self.history_queue if item[0] == patch_id), None)
+
+        if elemento_esistente:
+            self.history_queue.remove(elemento_esistente)
+            dati_per_view = [(pid, pixmap, nome, colore) for pid, pixmap, nome, colore in self.history_queue]
+            if hasattr(self.view, 'aggiorna_cronologia'):
+                self.view.aggiorna_cronologia(dati_per_view)
+
+        self.aggiorna_vista()
+
+    def salva_ed_esci(self):
+        self.salva_patch_attuale()
+        self.model.salva_su_disco()
         if self.naviga_alla_dashboard:
             self.naviga_alla_dashboard()
-        else:
-            raise ValueError("[ARCHITETTURA] Errore: Callback 'naviga_alla_dashboard' non iniettata!")

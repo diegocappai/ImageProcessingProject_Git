@@ -81,9 +81,10 @@ class VipsSlideManager(SlideManager):
         """Restituisce l'altezza massima dell'immagine (Livello 0)"""
         return self.vips_image.height
 
-    def extract_patch(self, tile_coords):
+    def extract_patch(self, tile_coords, target_size=None):
         """
-        Estrae una singola patch dal livello 0 (massima risoluzione)
+        Estrae una patch. Se target_size è impostato, naviga automaticamente
+        la piramide WSI per azzerare il consumo di RAM ed estrarre istantaneamente.
         """
         x, y, w, h = tile_coords
 
@@ -93,31 +94,50 @@ class VipsSlideManager(SlideManager):
         if y + h > self.height:
             y = max(0, self.height - h)
 
-        # Calcoliamo la porzione massima estraibile senza uscire dai bordi fisici dell'immagine
-        w_sicura = min(w, self.width - x)
-        h_sicura = min(h, self.height - y)
+        # 🟢 1. MOTORE DI SCELTA DEL LIVELLO (Se target_size è richiesto)
+        livello_scelto = self.livelli_piramide[0]  # Default: Massima risoluzione
 
-        if w_sicura <= (w // 2) or h_sicura <= (h // 2):
+        if target_size:
+            for lvl in self.livelli_piramide:
+                # Simuliamo: quanto sarebbe grande l'estrazione su questo livello?
+                estrazione_w = w / lvl['downsample']
+                estrazione_h = h / lvl['downsample']
+
+                livello_scelto = lvl
+                # Ci fermiamo appena l'estrazione scende a una grandezza vicina o inferiore al nostro target
+                if max(estrazione_w, estrazione_h) <= target_size:
+                    break
+
+        ds = livello_scelto['downsample']
+
+        # 🟢 2. TRASLAZIONE DELLE COORDINATE AL NUOVO LIVELLO
+        lvl_x = int(x / ds)
+        lvl_y = int(y / ds)
+        lvl_w = int(w / ds)
+        lvl_h = int(h / ds)
+
+        # Calcoliamo la porzione estraibile senza uscire dai bordi fisici
+        w_sicura = min(lvl_w, livello_scelto['width'] - lvl_x)
+        h_sicura = min(lvl_h, livello_scelto['height'] - lvl_y)
+
+        if w_sicura <= (lvl_w // 2) or h_sicura <= (lvl_h // 2):
             return None
 
+        # 🟢 3. ESTRAZIONE ULTRA-RAPIDA E PADDING
         try:
-            # Legge l'array di byte direttamente dalla RAM
-            raw_bytes = self.region.fetch(x, y, w, h)
-
-            # Re-impacchetta l'array di byte in un oggetto pyvips.Image
+            raw_bytes = livello_scelto['region'].fetch(lvl_x, lvl_y, w_sicura, h_sicura)
             patch = pyvips.Image.new_from_memory(
-                raw_bytes, w, h, self.vips_image.bands, self.vips_image.format
+                raw_bytes, w_sicura, h_sicura,
+                livello_scelto['image'].bands,
+                livello_scelto['image'].format
             )
         except pyvips.error.Error:
-            # Fallback: Se le coordinate sforano i bordi dell'immagine (edge case matematico), ripieghiamo in modo sicuro sul .crop() nativo.
-            patch = self.vips_image.crop(x, y, w, h)
+            patch = livello_scelto['image'].crop(lvl_x, lvl_y, w_sicura, h_sicura)
 
-        # PADDING
-        # Se la porzione che abbiamo ritagliato è più piccola della grandezza target
-        if w_sicura < w or h_sicura < h:
-            # posiziona la nostra patch alle coordinate (0,0) di un nuovo canvas grande (target_w, target_h)
+        # Padding se eravamo ai bordi del vetrino
+        if w_sicura < lvl_w or h_sicura < lvl_h:
             patch = patch.embed(
-                0, 0, w, h,
+                0, 0, lvl_w, lvl_h,
                 extend='background',
                 background=[255, 255, 255]
             )

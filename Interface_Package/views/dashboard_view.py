@@ -1,7 +1,7 @@
 import os
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QHBoxLayout,
-                               QProgressBar, QVBoxLayout, QScrollArea)
+                               QProgressBar, QVBoxLayout, QScrollArea, QSpinBox)
 
 
 class ProjectDashboardView(QWidget):
@@ -13,6 +13,7 @@ class ProjectDashboardView(QWidget):
     # ==========================================
     richiesta_inizio_etichettatura = Signal()
     richiesta_ritorno_home = Signal()
+    richiesta_cambio_campionamento = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -49,16 +50,33 @@ class ProjectDashboardView(QWidget):
 
         # 1. Informazioni Generali
         self.card_info, info_layout = self._crea_card("INFORMAZIONI GENERALI")
-        self.val_tipo = self._add_info_row(info_layout, "Tipo Input:")
+        #self.val_tipo = self._add_info_row(info_layout, "Tipo Input:")
         self.val_file = self._add_info_row(info_layout, "File Sorgente:")
-        self.val_patch_size = self._add_info_row(info_layout, "Dimensione Patch:")
+        #self.val_patch_size = self._add_info_row(info_layout, "Dimensione Patch:")
         content_layout.addWidget(self.card_info)
 
         # 2. Statistiche Campionamento
         self.card_stats, stats_layout = self._crea_card("STATISTICHE CAMPIONAMENTO")
         self.val_teoriche = self._add_info_row(stats_layout, "Patch totali:")
-        self.val_roi = self._add_info_row(stats_layout, "Patch nelle ROI:")
-        self.sampling_percentage = self._add_info_row(stats_layout, "Percentuale campionamento:")
+        #self.val_roi = self._add_info_row(stats_layout, "Patch nelle ROI:")
+        row_perc_layout = QHBoxLayout()
+        lbl_perc = QLabel("Percentuale campionamento:")
+        lbl_perc.setProperty("class", "InfoLabel")
+        self.spin_perc = QSpinBox()
+        self.spin_perc.setRange(10, 100)
+        self.spin_perc.setSingleStep(10)
+        self.spin_perc.setSuffix(" %")
+        self.spin_perc.setFixedWidth(120)
+        self.spin_perc.setMinimumHeight(38)
+        #self.spin_perc.setStyleSheet("background-color: #333; color: white; border: 1px solid #555;")
+
+        self.spin_perc.valueChanged.connect(self.richiesta_cambio_campionamento.emit)
+
+        row_perc_layout.addWidget(lbl_perc)
+        row_perc_layout.addStretch()
+        row_perc_layout.addWidget(self.spin_perc)
+        stats_layout.addLayout(row_perc_layout)
+
         self.val_sampled = self._add_info_row(stats_layout, "Patch da Etichettare:")
         content_layout.addWidget(self.card_stats)
 
@@ -142,33 +160,38 @@ class ProjectDashboardView(QWidget):
     # ==========================================
     def display_project(self, data: dict):
         """
-        Popola la dashboard
+        Popola la dashboard con estrazione sicura dei dati
         """
         name_project = data.get("case_id", "Progetto senza nome")
         self.lbl_project_name.setText(f"Progetto: {name_project}")
 
         # Info Generali
-        self.val_tipo.setText(data.get("source_type", "-"))
 
         percorso_sorgente = data.get("source_path", "-")
         self.val_file.setText(os.path.basename(percorso_sorgente))
 
-        p_size = data.get("patching_config", {}).get("patch_size")
-        self.val_patch_size.setText(f"{p_size} px" if p_size else "N/A")
+        # 🟢 FIX 1: Protezione su patching_config
+        patch_conf = data.get("patching_config")
+        patch_conf = patch_conf if isinstance(patch_conf, dict) else {}
 
-        # Statistiche
-        prog = data.get("progress", {})
+        # 🟢 FIX 2: Protezione su progress
+        prog = data.get("progress")
+        prog = prog if isinstance(prog, dict) else {}
         self.val_teoriche.setText(str(prog.get("total_patches", 0)))
 
         # Calcoli di presentazione
         patches = data.get("patches", [])
-        nelle_roi = sum(1 for p in patches if p.get("roi_id") is not None)
-        self.val_roi.setText(str(nelle_roi))
+        patches = patches if isinstance(patches, list) else [] # Sicurezza extra
 
-        percentuale = data.get("sampling_config", {}).get("sampling_percentage", 100)
-        self.sampling_percentage.setText(f"{percentuale} %")
+        # 🟢 FIX 3: Protezione su sampling_config
+        samp_conf = data.get("sampling_config")
+        samp_conf = samp_conf if isinstance(samp_conf, dict) else {}
+        percentuale = samp_conf.get("sampling_percentage", 100)
+        self.spin_perc.blockSignals(True)
+        self.spin_perc.setValue(percentuale)
+        self.spin_perc.blockSignals(False)
 
-        tot_campionate = sum(1 for p in patches if p.get("is_sampled") is not False)
+        tot_campionate = sum(1 for p in patches if isinstance(p, dict) and p.get("is_sampled") is not False)
         self.val_sampled.setText(f"{tot_campionate}")
 
         # Progresso

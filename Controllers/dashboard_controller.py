@@ -1,3 +1,5 @@
+from PySide6.QtWidgets import QMessageBox
+
 class ProjectDashboardController:
     """
     Controller per la Dashboard di Progetto
@@ -19,6 +21,7 @@ class ProjectDashboardController:
         """
         self.view.richiesta_inizio_etichettatura.connect(self.gestisci_avvio_etichettatura)
         self.view.richiesta_ritorno_home.connect(self.gestisci_ritorno_home)
+        self.view.richiesta_cambio_campionamento.connect(self.gestisci_cambio_campionamento)
 
     def aggiorna_vista(self):
         """
@@ -39,10 +42,114 @@ class ProjectDashboardController:
         case_id = self.model.data.get('case_id', 'Sconosciuto')
         print(f"[DEBUG - DASHBOARD] Avvio sessione di etichettatura per il progetto: {case_id}")
 
+        patch_totali_campionate = sum(1 for p in self.model.data.get("patches", []) if p.get("is_sampled"))
+
+        if patch_totali_campionate == 0:
+            QMessageBox.warning(
+                self.view,
+                "Nessuna Patch Campionata",
+                "Impossibile procedere.\n\n"
+                "Non ci sono patch selezionate per l'etichettatura. Controlla la percentuale di campionamento impostata."
+            )
+            return
+
         if self.naviga_a_etichettatura:
             self.naviga_a_etichettatura()
         else:
             raise ValueError("[ARCHITETTURA] Errore: Callback 'naviga_a_etichettatura' non iniettata!")
+
+    def gestisci_cambio_campionamento(self, nuova_perc: int):
+        """
+        Ricalcola il campionamento consentendo sia aumenti che diminuzioni incrementali,
+        inserendo un warning bloccante se l'utente scende sotto la quota di patch già lavorate.
+        """
+        from PySide6.QtWidgets import QMessageBox  # Import locale di sicurezza per PySide6
+
+        data = self.model.data
+        patch_list = data.get("patches", [])
+
+        if not patch_list:
+            return
+
+        totale_assoluto = len(patch_list)
+
+        # Calcoliamo il nuovo traguardo teorico richiesto dall'utente
+        nuovo_target = max(1, int(totale_assoluto * (nuova_perc / 100.0))) if totale_assoluto > 0 else 0
+
+        # Identifichiamo le patch intoccabili (già etichettate, saltate o mostrate a schermo)
+        intoccabili = [p for p in patch_list if p.get("status") in ["labeled", "skipped"] or p.get("shown_to_user")]
+        quante_intoccabili = len(intoccabili)
+
+        # =====================================================================
+        # CONTROLLO LIMITI DI SICUREZZA
+        # =====================================================================
+        if nuovo_target < quante_intoccabili:
+            # Calcoliamo matematicamente qual è la percentuale minima reale in questo preciso istante
+            perc_minima_richiesta = int((quante_intoccabili / totale_assoluto) * 100)
+            if (quante_intoccabili * 100) % totale_assoluto != 0:
+                perc_minima_richiesta += 1
+
+            QMessageBox.warning(
+                self.view,
+                "Operazione Annullata",
+                f"Impossibile ridurre il campionamento al {nuova_perc}%.\n\n"
+                f"Hai già lavorato o visualizzato {quante_intoccabili} patch su {totale_assoluto}.\n"
+                f"Per non perdere il lavoro svolto, la percentuale minima consentita attuale è del {perc_minima_richiesta}%."
+            )
+
+            self.view.spin_perc.setValue(perc_minima_richiesta)
+
+            self.aggiorna_vista()
+            return
+
+
+        attuali_campionate = [p for p in patch_list if p.get("is_sampled")]
+        quante_campionate_ora = len(attuali_campionate)
+        ordine = data.get("sampling_config", {}).get("ordine", "Sequenziale")
+
+        # CASO AUMENTO
+        if nuovo_target > quante_campionate_ora:
+            candidati_da_aggiungere = [p for p in patch_list if not p.get("is_sampled")]
+            quante_da_aggiungere = nuovo_target - quante_campionate_ora
+            quante_da_aggiungere = min(quante_da_aggiungere, len(candidati_da_aggiungere))
+
+            if quante_da_aggiungere > 0:
+                if ordine == "Random":
+                    import random
+                    da_attivare = random.sample(candidati_da_aggiungere, quante_da_aggiungere)
+                else:
+                    da_attivare = candidati_da_aggiungere[:quante_da_aggiungere]
+
+                for p in da_attivare:
+                    p["is_sampled"] = True
+                print(f"[DEBUG] Aggiunte {quante_da_aggiungere} nuove patch al campionamento.")
+
+        # CASO DIMINUZIONE
+        elif nuovo_target < quante_campionate_ora:
+            candidati_da_rimuovere = [p for p in attuali_campionate if p not in intoccabili]
+            quante_da_rimuovere = quante_campionate_ora - nuovo_target
+            quante_da_rimuovere = min(quante_da_rimuovere, len(candidati_da_rimuovere))
+
+            if quante_da_rimuovere > 0:
+                if ordine == "Random":
+                    import random
+                    da_disattivare = random.sample(candidati_da_rimuovere, quante_da_rimuovere)
+                else:
+                    da_disattivare = candidati_da_rimuovere[-quante_da_rimuovere:]
+
+                for p in da_disattivare:
+                    p["is_sampled"] = False
+                print(f"[DEBUG] Rimosse {quante_da_rimuovere} patch non lavorate in eccedenza.")
+
+        # Scrittura finale nel JSON e salvataggio
+        if "sampling_config" not in data:
+            data["sampling_config"] = {}
+        data["sampling_config"]["sampling_percentage"] = nuova_perc
+
+        if hasattr(self.model, "salva_su_disco"):
+            self.model.salva_su_disco()
+
+        self.aggiorna_vista()
 
     def gestisci_ritorno_home(self):
         print("[DEBUG - DASHBOARD] Ritorno alla Home richiesto dall'utente.")

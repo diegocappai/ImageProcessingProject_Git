@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 
 class ProjectManager:
     """
-    Core Model dell'applicazione:
     Mantiene in memoria il dizionario JSON completo del progetto e si occupa di sincronizzarlo in modo sicuro sul disco fisso
     """
 
@@ -24,8 +23,7 @@ class ProjectManager:
 
     def _ricalcola_progress(self):
         """
-        Motore di Statistica: Scansiona l'intero array delle patch e aggiorna
-        il contatore globale del progresso. Fondamentale per i grafici della Dashboard.
+        Scansiona l'intero array delle patch e aggiorna il contatore globale del progresso e le statistiche delle singole ROI
         """
         if "patches" not in self.data or "progress" not in self.data:
             return
@@ -35,15 +33,28 @@ class ProjectManager:
         saltate = sum(1 for p in self.data["patches"] if p["status"] == "skipped")
         mostrate = sum(1 for p in self.data["patches"] if p.get("shown_to_user", False))
 
-        # Aggiornamento dell'albero JSON
         self.data["progress"]["total_patches"] = totale
         self.data["progress"]["labeled_patches"] = etichettate
         self.data["progress"]["skipped_patches"] = saltate
         self.data["progress"]["shown_patches"] = mostrate
 
-        # Calcolo del completamento: se non ci sono più patch 'pending' nel campione, abbiamo finito.
         pendenti = sum(1 for p in self.data["patches"] if p["status"] == "pending" and p.get("is_sampled", False))
         self.data["progress"]["completed"] = (pendenti == 0 and totale > 0)
+
+        if "sampling_config" in self.data and "roi_list" in self.data["sampling_config"]:
+            for roi in self.data["sampling_config"]["roi_list"]:
+                roi_id = roi["id"]
+
+                patch_roi = [p for p in self.data["patches"] if p.get("roi_id") == roi_id]
+
+                sampling_roi = sum(1 for p in patch_roi if p.get("is_sampled", False))
+                labeled_in_roi = sum(1 for p in patch_roi if p["status"] == "labeled" and p.get("is_sampled", False))
+
+                if "stats" not in roi:
+                    roi["stats"] = {"total_valid": len(patch_roi), "sampled": 0, "labeled": 0}
+
+                roi["stats"]["sampled"] = sampling_roi
+                roi["stats"]["labeled"] = labeled_in_roi
 
     @staticmethod
     def genera_indici_campionamento(totale_patch, percentuale, modalita="Random"):
@@ -83,13 +94,11 @@ class ProjectManager:
         if not self.percorso_file_json:
             raise ValueError("Percorso del file JSON non impostato!")
 
-        # Aggiorna il timestamp e ricalcola le statistiche prima di ogni salvataggio
         self.data["updated_at"] = self._ora_corrente_iso()
         self._ricalcola_progress()
 
         try:
             with open(self.percorso_file_json, 'w', encoding='utf-8') as f:
-                # ensure_ascii=False permette di salvare correttamente eventuali accenti nelle note
                 json.dump(self.data, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"[DEBUG - ERROR] Errore critico durante il salvataggio del JSON: {e}")
@@ -104,7 +113,6 @@ class ProjectManager:
             return False
 
         try:
-            # Ricerca del manifesto di progetto
             file_json_trovati = [f for f in os.listdir(percorso_cartella) if f.endswith('.json')]
 
             if not file_json_trovati:
@@ -113,11 +121,9 @@ class ProjectManager:
             nome_file_json = file_json_trovati[0]
             percorso_completo_json = os.path.join(percorso_cartella, nome_file_json)
 
-            # Deserializzazione in RAM
             with open(percorso_completo_json, 'r', encoding='utf-8') as file:
                 self.data = json.load(file)
 
-            # Impostazione dello stato interno del Controller
             self.percorso_file_json = percorso_completo_json
             self.percorso_cartella_progetto = percorso_cartella
 
@@ -131,34 +137,19 @@ class ProjectManager:
     # ==========================================
     # CREAZIONE E MANIPOLAZIONE DATI
     # ==========================================
-    def crea_nuovo_progetto(self, cartella_destinazione, nome_progetto, tipo_sorgente, parametri_setup, classi_etichette, dati_patch, callback_ui=None):
+    def crea_nuovo_progetto(self, cartella_destinazione, nome_progetto, tipo_sorgente, parametri_setup,
+                            classi_etichette, dati_calcolati, callback_ui=None):
         """
-        Costruisce l'intero JSON del progetto
+        Costruisce l'intero JSON del progetto assemblando i dati pre-calcolati dal Model
         """
         self.percorso_cartella_progetto = cartella_destinazione
         self.percorso_file_json = os.path.join(self.percorso_cartella_progetto, f"{nome_progetto}_data.json")
 
         ora_attuale = self._ora_corrente_iso()
 
-        # Normalizzazione dei parametri
-        percentuale_raw = parametri_setup.get("percentuale", 100)
-        percentuale = int(str(percentuale_raw).replace("%", ""))
-        ordine = parametri_setup.get("ordine", "Sequential")
+        lista_roi = dati_calcolati.get("rois", [])
+        lista_patch = dati_calcolati.get("patches", [])
 
-        # ==============================================
-        # IDENTIFICAZIONE DEL POOL DI CAMPIONAMENTO
-        # ==============================================
-        # Se ci sono ROI, limitiamo il campionamento solo alle patch interne ad esse
-        patch_nelle_roi = [p for p in dati_patch if p.get('roi_id') is not None]
-        target_pool = patch_nelle_roi if patch_nelle_roi else dati_patch
-
-        # Otteniamo gli indici matematici
-        indici_attivi = self.genera_indici_campionamento(len(target_pool), percentuale, ordine)
-
-        # Usiamo l'indirizzo di memoria 'id()' dell'oggetto per creare un Set che ci dirà se una patch deve essere etichettata o no.
-        pool_attivi = set(id(target_pool[i]) for i in indici_attivi)
-
-        # Inizializzazione dello scheletro JSON
         self.data = {
             "schema_version": "1.0",
             "case_id": nome_progetto,
@@ -179,16 +170,14 @@ class ProjectManager:
                 "generated_by_program": True
             },
             "sampling_config": {
-                "roi_list": parametri_setup.get("roi_reali", []),
-                "sampling_percentage": percentuale,
-                "sampling_strategy": ordine.lower()
+                "roi_list": lista_roi
             },
             "labeling_config": {
-              "classes": classi_etichette
+                "classes": classi_etichette
             },
             "progress": {
-                "total_patches": len(pool_attivi),
-                "eligible_patches": len(target_pool),
+                "total_patches": len(lista_patch),
+                "eligible_patches": len(lista_patch),
                 "shown_patches": 0,
                 "labeled_patches": 0,
                 "skipped_patches": 0,
@@ -197,17 +186,18 @@ class ProjectManager:
             "patches": []
         }
 
-        # Generazione massiva delle Patch
-        totale_patch = len(dati_patch)
+        totale_patch = len(lista_patch)
         step_aggiornamento = max(1, totale_patch // 100)
+        totale_campionate = 0
 
-        for i, p_dati in enumerate(dati_patch, start=1):
+        for i, p_dati in enumerate(lista_patch, start=1):
 
-            # Se l'indirizzo di memoria di questa patch è nel set viene marcata
-            is_sampled = id(p_dati) in pool_attivi
+            is_sampled = p_dati.get("is_sampled", False)
+            if is_sampled:
+                totale_campionate += 1
 
             self.data["patches"].append({
-                "patch_id": f"p_{i:06d}",
+                "patch_id": p_dati.get("id", f"p_{i:06d}"),
                 "file_name": p_dati.get("percorso", None),
                 "x": p_dati.get("x", 0),
                 "y": p_dati.get("y", 0),
@@ -228,20 +218,17 @@ class ProjectManager:
                 percentuale_progresso = 30 + int((i / totale_patch) * 60)
                 callback_ui(percentuale_progresso, f"Scrittura patch {i} di {totale_patch}...")
 
-                import time
-                time.sleep(0.001)
-
         if callback_ui:
             callback_ui(95, "Salvataggio file su disco in corso...")
 
         self.salva_su_disco()
-        print(f"[DEBUG - PROJECT] Generato JSON. L'utente etichetterà {len(indici_attivi)} patch.")
+        print(
+            f"[DEBUG - PROJECT] Generato JSON. L'utente etichetterà {totale_campionate} patch su {totale_patch} valide trovate.")
 
     def aggiorna_patch(self, patch_id, label, note, da_rivedere, user_id="utente_locale"):
         """
         API chiamata durante l'Etichettatura: Aggiorna lo stato di una singola patch e innesca il salvataggio incrementale dei progressi
         """
-        # Ricerca lineare della patch tramite il suo ID univoco
         patch_trovata = next((p for p in self.data["patches"] if p["patch_id"] == patch_id), None)
 
         if not patch_trovata:
@@ -267,3 +254,58 @@ class ProjectManager:
 
         # Sincronizzazione sul file system
         self.salva_su_disco()
+
+    def modifica_percentuale_roi(self, roi_id, nuova_percentuale):
+        """
+        Modifica dinamicamente il numero di patch da etichettare per una ROI,
+        proteggendo le patch già etichettate.
+        """
+
+        roi = next((r for r in self.data["sampling_config"]["roi_list"] if r["id"] == roi_id), None)
+        if not roi:
+            return False, f"ROI {roi_id} non trovata nel progetto.", nuova_percentuale
+
+        patch_roi = [p for p in self.data["patches"] if p.get("roi_id") == roi_id]
+        totale_valide = len(patch_roi)
+
+        if totale_valide == 0:
+            return False, "Nessuna patch in questa ROI.", nuova_percentuale
+
+        patch_attualmente_campionate = [p for p in patch_roi if p.get("is_sampled", False)]
+
+        patch_gia_lavorate = [p for p in patch_attualmente_campionate if p["status"] != "pending"]
+        totale_lavorate = len(patch_gia_lavorate)
+
+        nuovo_target_campionate = max(1, int(totale_valide * (nuova_percentuale / 100.0)))
+
+        percentuale_finale_applicata = nuova_percentuale
+        messaggio = "Percentuale aggiornata con successo."
+
+        if nuovo_target_campionate < totale_lavorate:
+            nuovo_target_campionate = totale_lavorate
+            percentuale_finale_applicata = int((totale_lavorate / totale_valide) * 100)
+            messaggio = f"Hai già visualizzato {totale_lavorate} patch di questa ROI. \nLa percentuale non può scendere sotto il {percentuale_finale_applicata}%."
+
+        campionate_attuali_count = len(patch_attualmente_campionate)
+        delta = nuovo_target_campionate - campionate_attuali_count
+
+        if delta > 0:
+            patch_disponibili = [p for p in patch_roi if not p.get("is_sampled", False)]
+            da_aggiungere = random.sample(patch_disponibili, min(delta, len(patch_disponibili)))
+
+            for p in da_aggiungere:
+                p["is_sampled"] = True
+
+        elif delta < 0:
+            patch_rimovibili = [p for p in patch_attualmente_campionate if p["status"] == "pending"]
+            da_rimuovere = random.sample(patch_rimovibili, abs(delta))
+
+            for p in da_rimuovere:
+                p["is_sampled"] = False
+
+        roi["sampling_percentage"] = percentuale_finale_applicata
+        roi["stats"]["sampled"] = nuovo_target_campionate
+
+        self.salva_su_disco()
+
+        return True, messaggio, percentuale_finale_applicata

@@ -5,8 +5,12 @@ from PySide6.QtGui import Qt
 
 class VisualizzatorePatch(VisualizzatoreBase):
     def __init__(self):
+        label_immagine = QLabel()
+        label_immagine.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label_immagine.setScaledContents(True)
+
         # Iniettiamo una QLabel standard
-        super().__init__(QLabel())
+        super().__init__(label_immagine)
 
 
     def reset_interfaccia(self):
@@ -31,6 +35,16 @@ class VisualizzatorePatch(VisualizzatoreBase):
         # Chiamando questo metodo, la classe Base calcolerà la dimensione,
         # applicherà lo SmoothTransformation e la setterà sulla Label!
         self.aggiorna_visualizzazione()
+
+    """def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        # 🟢 LA MAGIA GEOMETRICA
+        # Prende l'altezza attuale (calcolata dinamicamente dal layout del monitor)
+        # e forza la larghezza MASSIMA ad essere esattamente identica.
+        # Questo spinge via il margine destro vuoto, cedendolo alla History!
+        lato_quadrato = self.height()
+        self.setMaximumWidth(lato_quadrato)"""
 
     def mostra_loading(self):
         self.message_label.setText("Caricamento patch successiva...")

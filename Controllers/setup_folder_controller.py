@@ -22,16 +22,16 @@ class SetupFolderController:
 
     def salva_configurazione(self):
         """
-        Estrae le scelte dall'utente e le inietta nel Model
+        Estrae le scelte dall'utente e le inietta nel Model di Setup
         """
         # Lettura dei widget dalla UI
         percentuale = self.view.combo_perc.currentText()
         ordine = "Sequenziale" if self.view.radio_seq.isChecked() else "Random"
 
-        # Aggiornamento dello stato nel Model
+        # Aggiornamento dello stato nel Model di Setup
         self.model.imposta_parametri_comuni(percentuale, ordine)
 
-        print(f"[DEBUG - SETUP FOLDER] Utente ha confermato parametri: {percentuale}, {ordine}")
+        print(f"[DEBUG - SETUP FOLDER] Utente ha confermato parametri di campionamento: {percentuale}, {ordine}")
 
         self.configurazione_salvata = True
 

@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                QLabel, QComboBox, QRadioButton, QPushButton, QMessageBox)
 from PySide6.QtGui import QCloseEvent
+from Interface_Package.widgets.class_selector_view import ClassSelectorWidget
+from Utils.ui_settings import CLASSI_DEFAULT
 
 
 class ImpostazioniDialog(QDialog):
@@ -61,6 +63,14 @@ class ImpostazioniDialog(QDialog):
 
         content_layout.addSpacing(10)
 
+        # ---------------------------------------------------------
+        # 🟢 COMPONENTE CLASSI (Approccio Senior)
+        # ---------------------------------------------------------
+        self.class_selector = ClassSelectorWidget(default_classes=CLASSI_DEFAULT)
+        content_layout.addWidget(self.class_selector)
+
+        content_layout.addSpacing(10)
+
         # Action Area (Bottoni Finali)
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -78,6 +88,9 @@ class ImpostazioniDialog(QDialog):
         content_layout.addLayout(btn_layout)
         main_layout.addLayout(content_layout)
 
+
+    def get_classi_etichette(self) -> list:
+        return self.class_selector.get_selected_classes()
 
     def closeEvent(self, event: QCloseEvent):
         box = QMessageBox(self)

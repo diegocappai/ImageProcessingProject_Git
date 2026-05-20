@@ -129,64 +129,108 @@ class SetupSlideModel(BaseSetupModel):
         return list(patch_valide.values())
 
     def prepara_dati(self, callback_ui=None):
-        """Assembla i dati definitivi passando attraverso i filtri"""
+        """Assembla i dati definitivi, tracciando TUTTE le patch valide del vetrino"""
+        import random
+
         if not self.manager or self.grandezza_patch <= 0:
-            return []
+            return {"rois": [], "patches": []}
 
         self.notifica_ui(callback_ui, 5, "Inizializzazione motore PyVips...")
-
         self.manager = get_manager('Slide', self.percorso_slide, tile_w=self.grandezza_patch,
                                    tile_h=self.grandezza_patch)
-
-        # Popolamento griglia teorica
         self.manager.patches_coords = self.manager.get_coords()
 
-        # Filtraggio
-        self.notifica_ui(callback_ui, 10, "Analisi del tessuto in corso con PyVips...")
-        print("[DEBUG] Calcolo delle zone di tessuto in corso...")
+        self.notifica_ui(callback_ui, 10, "Analisi del tessuto su tutto il vetrino in corso...")
+        # Otsu restituisce TUTTE le patch con tessuto sull'intera WSI
         coordinate_valide = self.manager.get_tissue_coords(tissue_coverage=0.1)
 
-        dati_pronti = []
-        for coord in coordinate_valide:
-            dati_pronti.append({
-                "x": int(coord[0]), "y": int(coord[1]),
-                "dimensione": int(coord[2]), "percorso": None
+        roi_list_json = []
+        patches_json = []
+        percentuale_base = getattr(self, 'percentuale', 100)
+
+        rois_da_processare = getattr(self, 'roi_list', [])
+        for idx, r in enumerate(rois_da_processare):
+            if 'id' not in r:
+                r['id'] = f"ROI_{idx + 1}"
+
+        step_x = float(self.grandezza_patch)
+        step_y = float(self.grandezza_patch)
+        totale_patch_analizzate = len(coordinate_valide)
+        step_aggiornamento = self.calcola_step(totale_patch_analizzate)
+
+        patch_per_roi = {roi["id"]: [] for roi in rois_da_processare}
+        patch_fuori_roi = []
+
+        for idx, coord in enumerate(coordinate_valide):
+            px, py, pw, ph = float(coord[0]), float(coord[1]), float(coord[2]), float(coord[3])
+
+            assegnata_a_roi = False
+            w_reale = min(step_x, self.larghezza_originale - px)
+            h_reale = min(step_y, self.altezza_originale - py)
+            soglia_dinamica = (w_reale * h_reale) * 0.40
+
+            for roi in rois_da_processare:
+                rx, ry = float(roi['x']), float(roi['y'])
+                rw, rh = float(roi['width']), float(roi['height'])
+
+                dx = max(0.0, min(px + step_x, rx + rw) - max(px, rx))
+                dy = max(0.0, min(py + step_y, ry + rh) - max(py, ry))
+
+                if (dx * dy) >= soglia_dinamica:
+                    patch_per_roi[roi["id"]].append((px, py, pw, ph))
+                    assegnata_a_roi = True
+                    break
+
+            if not assegnata_a_roi:
+                patch_fuori_roi.append((px, py, pw, ph))
+
+            if callback_ui and idx % step_aggiornamento == 0:
+                self.notifica_ui(callback_ui, 30 + int((idx / totale_patch_analizzate) * 30),
+                                 f"Mappatura patch {idx} di {totale_patch_analizzate}...")
+
+        for roi in rois_da_processare:
+            roi_id = roi["id"]
+            patch_in_questa_roi = patch_per_roi[roi_id]
+
+            totale_utili = len(patch_in_questa_roi)
+            da_campionare = max(1, int(totale_utili * (percentuale_base / 100.0))) if totale_utili > 0 else 0
+            patch_scelte = set(random.sample(patch_in_questa_roi, da_campionare)) if totale_utili > 0 else set()
+
+            for (px, py, pw, ph) in patch_in_questa_roi:
+                patches_json.append({
+                    "id": f"p_{int(px)}_{int(py)}",
+                    "roi_id": roi_id,
+                    "x": int(px), "y": int(py), "w": int(pw), "h": int(ph),
+                    "is_sampled": (px, py, pw, ph) in patch_scelte,
+                    "label": None,
+                    "is_review": False
+                })
+
+            roi_list_json.append({
+                "id": roi_id,
+                "x": int(roi['x']), "y": int(roi['y']), "w": int(roi['width']), "h": int(roi['height']),
+                "sampling_percentage": percentuale_base,
+                "stats": {"total_valid": totale_utili, "sampled": da_campionare, "labeled": 0}
             })
 
-        # Timbratura ROI
-        if hasattr(self, 'roi_list') and self.roi_list:
-            step = float(self.grandezza_patch)
-            totale_patch = len(dati_pronti)
-            step_aggiornamento = self.calcola_step(totale_patch)
+        for (px, py, pw, ph) in patch_fuori_roi:
+            patches_json.append({
+                "id": f"p_{int(px)}_{int(py)}",
+                "roi_id": None,  # Non appartiene a nessuna ROI
+                "x": int(px), "y": int(py), "w": int(pw), "h": int(ph),
+                "is_sampled": False,  # Di base, non verrà MAI mostrata al medico
+                "label": None,
+                "is_review": False
+            })
 
-            for i, patch in enumerate(dati_pronti):
-                patch['roi_id'] = None
-                px, py = float(patch['x']), float(patch['y'])
+        patches_json.sort(key=lambda p: (p['y'], p['x']))
 
-                w_reale = min(step, self.larghezza_originale -px)
-                h_reale = min(step, self.altezza_originale - py)
-                soglia_dinamica = (w_reale * h_reale) * 0.40
+        print(f"[DEBUG] Setup completato: {len(patches_json)} patch valide totali trovate nel vetrino.")
 
-                for r_idx, r in enumerate(self.roi_list):
-                    rx, ry = float(r['x']), float(r['y'])
-                    rw, rh = float(r['width']), float(r['height'])
-
-                    dx = max(0.0, min(px + step, rx + rw) - max(px, rx))
-                    dy = max(0.0, min(py + step, ry + rh) - max(py, ry))
-
-                    if (dx * dy) >= soglia_dinamica:
-                        patch['roi_id'] = f"ROI_{r_idx + 1}"
-                        break
-
-                if i % step_aggiornamento == 0:
-                    percentuale = 10 + int((i / totale_patch) * 20)
-                    self.notifica_ui(callback_ui, percentuale, f"Incrocio ROI patch {i} di {totale_patch}...")
-                    import time
-                    time.sleep(0.001)
-
-        print(f"[DEBUG] Trovate {len(dati_pronti)} patch valide con tessuto!")
-        return dati_pronti
-
+        return {
+            "rois": roi_list_json,
+            "patches": patches_json
+        }
 
 # ==========================================
 # CLASSE PER DATASET FOLDER

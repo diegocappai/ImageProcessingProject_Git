@@ -33,8 +33,8 @@ class SlideManager(ImageManager, ABC):
         pass
 
     @abstractmethod
-    def extract_patch(self, tile_coords):
-        """Estrae l'immagine reale data una coordinata (x, y, w, h)"""
+    def extract_patch(self, tile_coords, target_size=None):
+        """Estrae l'immagine reale data una coordinata (x, y, w, h) Se target_size è impostato, usa la piramide per ottimizzare."""
         pass
 
     @abstractmethod

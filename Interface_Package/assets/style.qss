@@ -181,11 +181,11 @@ QPushButton[class="LabelButton"]:hover {
     background-color: #2a2a2a;
 }
 
-/* QUANDO È SELEZIONATO (Il colore esplode e rimuove ogni ambiguità) */
+
 QPushButton[class="LabelButton"]:checked {
-    background-color: #4b8bcf; /* Azzurro primario del tuo software */
-    border: 2px solid #4b8bcf; /* Il bordo diventa dello stesso colore */
-    color: white; /* Testo brillante */
+    background-color: #4b8bcf;
+    border: 2px solid #4b8bcf;
+    color: white;
 }
 
 /* Area Note */
@@ -195,7 +195,6 @@ QTextEdit[class="NoteInput"] {
     border: 1px solid #444444;
     border-radius: 4px;
     padding: 8px;
-    /* NIENTE CORSIVO PER L'INPUT UTENTE, E' UNA PESSIMA UX! */
     font-style: normal;
 }
 QTextEdit[class="NoteInput"]:focus {
@@ -221,7 +220,7 @@ QLabel[class="HeaderTitle"] {
     font-weight: bold;
 }
 
-/* Etichette Informative (Chiave - Valore) */
+/* Etichette Informative */
 QLabel[class="InfoLabel"] {
     color: #999999;
     font-size: 13px;
@@ -232,13 +231,13 @@ QLabel[class="InfoValue"] {
     color: #ffffff;
     font-size: 13px;
     font-weight: bold;
-    background-color: #333333; /* Crea il riquadro */
-    padding: 4px 12px; /* Dà respiro al testo */
-    border-radius: 6px; /* Arrotonda il riquadro */
+    background-color: #333333;
+    padding: 4px 12px;
+    border-radius: 6px;
     border: 1px solid #444444;
 }
 
-/* Bottone Indietro (Trasparente con bordo) */
+/* Bottone Indietro */
 QPushButton#BtnBack {
     background-color: transparent;
     color: #aaaaaa;
@@ -258,8 +257,8 @@ QProgressBar {
     color: white;
     border: none;
     border-radius: 6px;
-    min-height: 18px; /* Un po' più alta per contenere il testo percentuale */
-    text-align: center; /* Centra la percentuale */
+    min-height: 18px;
+    text-align: center;
 }
 QProgressBar::chunk {
     background-color: #4b8bcf;
@@ -274,7 +273,7 @@ QProgressBar::chunk {
 QLabel[class="InstructionLabel"] { color: #aaaaaa; font-size: 11px; }
 QLabel[class="HighlightLabel"] { color: #4b8bcf; font-weight: bold; }
 
-/* Icona Info (La "i" blu tonda) */
+/* Icona Info */
 QLabel[class="InfoBadge"] {
     background-color: #4b8bcf;
     color: white;
@@ -285,7 +284,7 @@ QLabel[class="InfoBadge"] {
 }
 QLabel[class="InfoBadge"]:hover { background-color: #5c9cdf; }
 
-/* Bottoncini piccoli per strumenti (es. Cancella ROI) */
+/* Bottoncini piccoli per strumenti */
 QPushButton[class="SmallToolButton"] {
     background-color: #333333;
     color: white;

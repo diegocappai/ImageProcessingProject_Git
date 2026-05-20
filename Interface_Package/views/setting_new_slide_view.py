@@ -7,6 +7,8 @@ from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QCloseEvent
 
 from Interface_Package.widgets.roi_graphics_view import RoiGraphicsView
+from Utils.ui_settings import CLASSI_DEFAULT
+from Interface_Package.widgets.class_selector_view import ClassSelectorWidget
 
 
 class ImpostazioniSlideDialog(QDialog):
@@ -54,27 +56,9 @@ class ImpostazioniSlideDialog(QDialog):
 
         self.roi_view = RoiGraphicsView()
         self.roi_view.setMinimumSize(500, 400)
+        self.roi_view.imposta_modalita_disegno(False)
+
         left_vlayout.addWidget(self.roi_view)
-
-        istruzioni_label = QLabel("🖱️ Click Sinistro: Sposta | Click Destro: Disegna ROI | Rotellina: Deep Zoom")
-        istruzioni_label.setProperty("class", "InstructionLabel")
-        left_vlayout.addWidget(istruzioni_label)
-
-        # Toolbox ROI
-        roi_btns_layout = QHBoxLayout()
-        self.btn_undo_roi = QPushButton("↩ Annulla ultima ROI")
-        self.btn_undo_roi.setProperty("class", "SmallToolButton")
-        self.btn_clear_rois = QPushButton("🗑 Cancella tutte")
-        self.btn_clear_rois.setProperty("class", "SmallToolButton")
-
-        self.btn_undo_roi.clicked.connect(self.roi_view.undo_last_roi)
-        self.btn_clear_rois.clicked.connect(self.roi_view.clear_all_rois)
-
-        roi_btns_layout.addWidget(self.btn_undo_roi)
-        roi_btns_layout.addWidget(self.btn_clear_rois)
-        roi_btns_layout.addStretch()
-
-        left_vlayout.addLayout(roi_btns_layout)
         top_hlayout.addLayout(left_vlayout, stretch=3)
 
         # --- PANNELLO DESTRO ---
@@ -137,19 +121,15 @@ class ImpostazioniSlideDialog(QDialog):
 
         right_vlayout.addLayout(patch_tot_layout)
 
-        self.label_n_patch_roi = QLabel("Patch valide nelle ROI:\n0")
-        self.label_n_patch_roi.setProperty("class", "HighlightLabel")
-        right_vlayout.addWidget(self.label_n_patch_roi)
-
         right_vlayout.addSpacing(15)
 
         # SEZIONE ETICHETTE
-        etichette_label = QLabel("Classi di Etichette:")
-        right_vlayout.addWidget(etichette_label)
+        self.class_selector = ClassSelectorWidget(default_classes=CLASSI_DEFAULT)
+        right_vlayout.addWidget(self.class_selector)
 
-        # --- Etichette Standard ---
-        standard_label = QLabel("Standard:")
-        right_vlayout.addWidget(standard_label)
+        #content_layout.addSpacing(10)
+        """etichette_label = QLabel("Classi di Etichette:")
+        right_vlayout.addWidget(etichette_label)
 
         self.checkboxes_labels = []
         classi_fisse = ["Normal", "Tumor", "Stroma", "Necrosi", "Infiammazione", "Vasi Sanguigni", "Mucina"]
@@ -158,7 +138,7 @@ class ImpostazioniSlideDialog(QDialog):
         self.grid_labels.setVerticalSpacing(5)
         self.grid_labels.setHorizontalSpacing(10)
 
-        for i, nome_classe in enumerate(classi_fisse):
+        for i, nome_classe in enumerate(CLASSI_DEFAULT):
             cb = QCheckBox(nome_classe)
             if nome_classe in ["Normal", "Tumor"]:
                 cb.setChecked(True)
@@ -168,10 +148,10 @@ class ImpostazioniSlideDialog(QDialog):
             self.grid_labels.addWidget(cb, i // 2, i % 2)
 
         right_vlayout.addLayout(self.grid_labels)
-        right_vlayout.addSpacing(10)
+        right_vlayout.addSpacing(10)"""
 
         # Layout Inserimento
-        input_etichetta_layout = QHBoxLayout()
+        """input_etichetta_layout = QHBoxLayout()
         self.input_nuova_etichetta = QLineEdit()
         self.input_nuova_etichetta.setPlaceholderText("Es. Personalizzata...")
 
@@ -181,7 +161,7 @@ class ImpostazioniSlideDialog(QDialog):
 
         input_etichetta_layout.addWidget(self.input_nuova_etichetta)
         input_etichetta_layout.addWidget(self.btn_aggiungi_etichetta)
-        right_vlayout.addLayout(input_etichetta_layout)
+        right_vlayout.addLayout(input_etichetta_layout)"""
 
         top_hlayout.addLayout(right_vlayout, stretch=1)
         content_layout.addLayout(top_hlayout)
@@ -189,27 +169,7 @@ class ImpostazioniSlideDialog(QDialog):
         # ==========================================
         # SEZIONE INFERIORE
         # ==========================================
-        perc_layout = QHBoxLayout()
-        perc_label = QLabel("Percentuale di campionamento ROI:")
 
-        self.combo_perc = QComboBox()
-        self.combo_perc.addItems([f"{i}%" for i in range(10, 101, 10)])
-        self.combo_perc.setCurrentText("30%")
-
-        perc_layout.addWidget(perc_label)
-        perc_layout.addWidget(self.combo_perc)
-        perc_layout.addStretch()
-        content_layout.addLayout(perc_layout)
-
-        order_label = QLabel("Ordine di visualizzazione per l'etichettatura:")
-        content_layout.addWidget(order_label)
-
-        self.radio_seq = QRadioButton("Sequenziale")
-        self.radio_seq.setChecked(True)
-        self.radio_rand = QRadioButton("Random")
-
-        content_layout.addWidget(self.radio_seq)
-        content_layout.addWidget(self.radio_rand)
 
         # Action Area
         btn_layout = QHBoxLayout()
@@ -294,25 +254,6 @@ class ImpostazioniSlideDialog(QDialog):
     # ==========================================
     # API PUBBLICHE
     # ==========================================
-    def imposta_immagine_anteprima(self, pixmap_pronto, orig_w: int, orig_h: int):
-        """Carica il thumbnail di base per la navigazione fluida"""
-        if not pixmap_pronto.isNull():
-            self.orig_w = orig_w
-            self.orig_h = orig_h
-            self.thumb_w = pixmap_pronto.width()
-            self.thumb_h = pixmap_pronto.height()
-
-            self.roi_view.scene.clear()
-            self.roi_view.roi_items.clear()
-
-            sfondo_item = QGraphicsPixmapItem(pixmap_pronto)
-            sfondo_item.setZValue(-1)
-            self.roi_view.scene.addItem(sfondo_item)
-
-            self.roi_view.setSceneRect(0, 0, pixmap_pronto.width(), pixmap_pronto.height())
-            self.roi_view.fitInView(self.roi_view.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
-        else:
-            print("[DEBUG - ERROR] View: Ricevuto QPixmap nullo o corrotto.")
 
     def aggiorna_griglia_visiva(self, real_patch_size: int, offset_x=0, offset_y=0):
         """
@@ -327,43 +268,22 @@ class ImpostazioniSlideDialog(QDialog):
 
             self.roi_view.set_grid_step(grid_step_x, grid_step_y, offset_x, offset_y)
 
+            # Forza lo zoom se la spunta della griglia è attiva
+            if self.checkbox_griglia.isChecked():
+                self.roi_view.set_zoom_grid()
+
     def set_griglia_visiva(self, visibile: bool):
         self.roi_view.imposta_visibilita_griglia(visibile)
 
-    def aggiorna_layer_alta_risoluzione(self, pixmap_alta_ris, rect_visibile: QRectF):
-        """
-        Gestisce la memoria della Deep Zoom Pyramid
-        """
-        # Garbage Collection proattiva: prevenzione di memory leak (RAM bloat)
-        if hasattr(self, 'current_hd_tile') and self.current_hd_tile:
-            self.roi_view.scene.removeItem(self.current_hd_tile)
-            self.current_hd_tile = None
-
-        if pixmap_alta_ris is None or pixmap_alta_ris.isNull():
-            return
-
-        self.current_hd_tile = QGraphicsPixmapItem(pixmap_alta_ris)
-        self.current_hd_tile.setPos(rect_visibile.topLeft())
-
-        scala_x = rect_visibile.width() / pixmap_alta_ris.width()
-        scala_y = rect_visibile.height() / pixmap_alta_ris.height()
-
-        from PySide6.QtGui import QTransform
-        self.current_hd_tile.setTransform(QTransform().scale(scala_x, scala_y))
-        self.current_hd_tile.setZValue(-0.5)
-        self.roi_view.scene.addItem(self.current_hd_tile)
 
     def aggiorna_totale_patch(self, n):
         self.label_n_patch_tot.setText(f"Numero Patch Totali:\n{n}")
 
-    def aggiorna_conteggio_roi(self, n):
-        self.label_n_patch_roi.setText(f"Patch valide nelle ROI:\n{n}")
-
     def get_classi_etichette(self) -> list:
         """
-        Assembla un'unica lista pulita unendo le Checkbox attivate e le classi Custom aggiunte
+        Delega interamente la raccolta delle classi selezionate o custom al widget condiviso.
         """
-        return [cb.text() for cb in self.checkboxes_labels if cb.isChecked()]
+        return self.class_selector.get_selected_classes()
 
     def get_dimensioni_miniatura(self) -> tuple:
         return self.roi_view.get_dimensioni_scena()
@@ -371,17 +291,6 @@ class ImpostazioniSlideDialog(QDialog):
     def get_grandezza_patch(self) -> int:
         return int(self.combo_patch.currentText())
 
-    def get_roi_rects(self) -> list:
-        return self.roi_view.get_roi_rects()
-
-    def get_area_visibile_pura(self) -> Optional[Dict[str, float]]:
-        return self.roi_view.get_area_visibile_pura()
-
-    def get_perc_sampling(self) -> str:
-        return self.combo_perc.currentText()
-
-    def get_sampling_order(self) -> str:
-        return "Sequenziale" if self.radio_seq.isChecked() else "Random"
 
     def closeEvent(self, event: QCloseEvent):
         box = QMessageBox(self)
