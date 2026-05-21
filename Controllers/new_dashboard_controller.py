@@ -1,5 +1,5 @@
 from PySide6.QtCore import QRectF
-from PySide6.QtWidgets import QMessageBox, QDialog
+from PySide6.QtWidgets import QMessageBox
 
 from ImageManager_Package import get_manager
 from Interface_Package.views.new_dashboard_view import NewRoiDialog

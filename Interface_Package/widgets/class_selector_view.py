@@ -15,7 +15,7 @@ class ClassSelectorWidget(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  # Nessun margine perché sarà iniettato in altri layout
+        layout.setContentsMargins(0, 0, 0, 0)
 
         labels_title = QLabel("<b>Classi di Etichettatura Richieste:</b>")
         layout.addWidget(labels_title)
@@ -48,7 +48,7 @@ class ClassSelectorWidget(QWidget):
 
         cb.clicked.connect(self.verifica_limite_spunte)
         self.checkboxes.append(cb)
-        self.grid_labels.addWidget(cb, index // 2, index % 2)  # 2 colonne automatiche
+        self.grid_labels.addWidget(cb, index // 2, index % 2)
 
     def aggiungi_classe(self):
         """Logica di validazione e aggiunta"""

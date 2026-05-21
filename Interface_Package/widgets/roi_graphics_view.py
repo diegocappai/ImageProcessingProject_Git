@@ -6,12 +6,10 @@ from Utils.pyvips_to_qpixmap import pyvips_to_qpixmap
 
 class RoiGraphicsView(QGraphicsView):
     """
-    Componente visivo interattivo (View) per l'esplorazione e l'annotazione delle WSI.
-    Gestisce Panning, Deep Zoom ancorato, disegno dinamico di ROI e rendering
-    ottimizzato della griglia di campionamento.
+    Componente visivo interattivo per l'esplorazione e l'annotazione delle WSI
     """
 
-    # Segnali personalizzati per comunicare con il Controller (Observer Pattern)
+    # Segnali personalizzati per comunicare con il Controller
     vista_cambiata = Signal()
     roi_modificate = Signal()
     selezione_area = Signal(QRectF)
@@ -20,13 +18,13 @@ class RoiGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Inizializzazione del pattern Scene-View di Qt
+
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
         # Disabilitiamo i comportamenti default per gestirli manualmente in modo ottimizzato
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)  # Smussatura hardware dei pixel
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # ==========================
         # MACCHINA A STATI
@@ -118,9 +116,7 @@ class RoiGraphicsView(QGraphicsView):
             return
 
         self.fitInView(self.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
-        # Il min_zoom diventa lo zoom attuale dopo il fit (l'immagine occupa tutto lo spazio)
         self.min_zoom = self.transform().m11()
-        # Il max_zoom è 1.0 (risoluzione nativa per non sgranare le patch)
         self.max_zoom = 1.0
 
     def _renderizza_deep_zoom(self):
@@ -170,43 +166,37 @@ class RoiGraphicsView(QGraphicsView):
 
     def wheelEvent(self, event):
         """
-        Override: Gestisce lo Zoom (Rotellina del mouse) mantenendo immobile
-        l'oggetto che si trova esattamente sotto il cursore e rispettando i limiti.
+        Override: Gestisce lo Zoom
         """
         zoom_in_factor = 1.15
         zoom_out_factor = 1.0 / zoom_in_factor
 
-        # 1. Calcoliamo il fattore di scala base
+        # Calcoliamo il fattore di scala base
         fattore = zoom_in_factor if event.angleDelta().y() > 0 else zoom_out_factor
 
-        # 2. Calcoliamo quale sarebbe lo zoom finale
+        # Calcoliamo quale sarebbe lo zoom finale
         zoom_attuale = self.transform().m11()
         zoom_futuro = zoom_attuale * fattore
 
-        # 3. 🟢 BLOCCO LIMITI ZOOM
+        # BLOCCO LIMITI ZOOM
         if zoom_futuro < self.min_zoom:
             fattore = self.min_zoom / zoom_attuale
         elif zoom_futuro > self.max_zoom:
             fattore = self.max_zoom / zoom_attuale
 
-        # 4. Applichiamo lo zoom solo se permesso dai limiti
-        # (Se fattore == 1.0 significa che abbiamo sbattuto contro il limite massimo o minimo)
+        # Applichiamo lo zoom solo se permesso dai limiti
         if abs(fattore - 1.0) > 0.0001:
             # Coordinate prima della trasformazione
             old_pos_view = event.position().toPoint()
             old_pos_scene = self.mapToScene(old_pos_view)
 
-            # Applicazione della matrice di scala controllata
             self.scale(fattore, fattore)
 
-            # Dove si trova ora quel punto a causa della matrice?
             new_pos_view = self.mapFromScene(old_pos_scene)
 
-            # Calcolo dell'errore (Delta) per compensare lo slittamento
             delta_x = new_pos_view.x() - old_pos_view.x()
             delta_y = new_pos_view.y() - old_pos_view.y()
 
-            # Compensazione hardware tramite le scrollbar (Mantiene il cursore ancorato)
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() + delta_x)
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() + delta_y)
 
@@ -234,26 +224,24 @@ class RoiGraphicsView(QGraphicsView):
 
                 self.targeted_sampling = True
                 self.roi_bersaglio = roi_trovata_rect
-                # Creiamo il rettangolo di selezione (Stile: Arancione Tratteggiato)
                 self.rubber_band_item = QGraphicsRectItem()
                 pen = QPen(QColor(255, 165, 0), 2, Qt.PenStyle.DashLine)
                 pen.setCosmetic(True)
-                brush = QBrush(QColor(255, 165, 0, 50))  # Arancione semitrasparente
+                brush = QBrush(QColor(255, 165, 0, 50))
 
                 self.rubber_band_item.setPen(pen)
                 self.rubber_band_item.setBrush(brush)
-                self.rubber_band_item.setZValue(100)  # Lo mettiamo sopra a tutto
+                self.rubber_band_item.setZValue(100)
                 self.scene.addItem(self.rubber_band_item)
                 event.accept()
             else:
-                # Comportamento normale (Panning)
                 self.panning = True
                 self.last_mouse_pos = event.position().toPoint()
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 event.accept()
 
         elif event.button() == Qt.MouseButton.RightButton and self.disegno_abilitato:
-            # Protezione: Se clicco su una ROI già disegnata, non iniziare a disegnarne una nuova
+            # Protezione: Se clicco su una ROI già disegnata, non inizia a disegnarne una nuova
             self.start_point = self.mapToScene(event.position().toPoint())
 
             for rect_bloccato in self.rois_bloccate:
@@ -265,14 +253,14 @@ class RoiGraphicsView(QGraphicsView):
                 return
 
             self.drawing = True
-            # Mappiamo le coordinate hardware del mouse sulla scena virtuale
+            # Mappiamo le coordinate del mouse sulla scena virtuale
 
             self.last_valid_rect = QRectF(self.start_point, self.start_point)
             self.current_rect_item = QGraphicsRectItem()
 
             # Stile della nuova ROI
             pen = QPen(QColor(0, 255, 0), 1)
-            pen.setCosmetic(True)  # Il bordo non si ingrossa durante lo zoom
+            pen.setCosmetic(True)
             brush = QBrush(QColor(0, 255, 0, 30))
 
             self.current_rect_item.setPen(pen)
@@ -296,7 +284,6 @@ class RoiGraphicsView(QGraphicsView):
             current_mouse_pos = event.position().toPoint()
             delta = current_mouse_pos - self.last_mouse_pos
 
-            # Muoviamo letteralmente la telecamera (scrollbar)
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
 
@@ -341,11 +328,9 @@ class RoiGraphicsView(QGraphicsView):
                 if self.rubber_band_item:
                     rect_finale = self.rubber_band_item.rect()
 
-                    # Eliminiamo il rettangolo arancione dalla scena (era solo un tool visivo)
                     self.scene.removeItem(self.rubber_band_item)
                     self.rubber_band_item = None
 
-                    # Se la selezione non è un click accidentale (minimo 5x5 px), emettiamo il segnale!
                     if rect_finale.width() > 5 and rect_finale.height() > 5:
                         self.selezione_area.emit(rect_finale)
                 event.accept()
@@ -362,7 +347,6 @@ class RoiGraphicsView(QGraphicsView):
                 if self.current_rect_item:
                     rect = self.current_rect_item.rect()
 
-                    # Prevenzione di click accidentali (micro-roi invisibili)
                     if rect.width() > 5 and rect.height() > 5:
                         self.roi_items.append(self.current_rect_item)
                         self.roi_modificate.emit()
@@ -425,18 +409,17 @@ class RoiGraphicsView(QGraphicsView):
         self.grid_step_y = step_y
         self.grid_offset_x = offset_x
         self.grid_offset_y = offset_y
-        self.viewport().update()  # Forza il ridisegno
+        self.viewport().update()
 
     def drawForeground(self, painter, rect):
         """
-        Disegna SOLO le linee che cadono nel "rect" attualmente inquadrato
+        Disegna solo le linee che cadono nel "rect" attualmente inquadrato
         """
         if not self.mostra_griglia or self.grid_step_x <= 0 or self.grid_step_y <= 0:
             return
 
         super().drawForeground(painter, rect)
 
-        # Sicurezza anti-lag: se facciamo troppo zoom out (le linee sarebbero troppo fitte e sovrapposte)
         livello_zoom = self.transform().m11()
         if self.grid_step_x * livello_zoom < 4:
             return
@@ -448,19 +431,16 @@ class RoiGraphicsView(QGraphicsView):
         # Stile della griglia
         pen = QPen(QColor(0, 255, 0, 180))
         pen.setWidth(2)
-        pen.setCosmetic(True)  # Mantiene lo spessore intatto indipendentemente dallo zoom
+        pen.setCosmetic(True)
         pen.setStyle(Qt.PenStyle.SolidLine)
         painter.setPen(pen)
 
-        # Delimitazione dell'area visibile
         left, right = int(rect_disegno.left()), int(rect_disegno.right())
         top, bottom = int(rect_disegno.top()), int(rect_disegno.bottom())
 
-        # Matematica Modulare: trova la prima coordinata della griglia che cade nell'area visibile
         start_x = left - ((left - self.grid_offset_x) % self.grid_step_x)
         start_y = top - ((top - self.grid_offset_y) % self.grid_step_y)
 
-        # Batch Rendering: accumuliamo in un array per processarle simultaneamente
         lines = []
 
         x = start_x
@@ -473,7 +453,7 @@ class RoiGraphicsView(QGraphicsView):
             lines.append(QLineF(left, y, right, y))
             y += self.grid_step_y
 
-        painter.drawLines(lines)  # Disegno vettoriale accelerato
+        painter.drawLines(lines)
 
     def imposta_visibilita_griglia(self, visibile):
         self.mostra_griglia = visibile
@@ -487,30 +467,21 @@ class RoiGraphicsView(QGraphicsView):
         if self.grid_step_x <= 0:
             return
 
-        # La condizione anti-lag è: grid_step_x * zoom >= 4
-        # Quindi il livello di zoom minimo richiesto è: 4 / grid_step_x
-        # Aggiungiamo un piccolo margine (es. 1.2) per essere sicuri che si veda chiaramente
         zoom_minimo_richiesto = (4.0 / self.grid_step_x) * 1.2
 
         zoom_attuale = self.transform().m11()
 
-        # Se lo zoom attuale è già sufficiente, non facciamo nulla.
-        # Altrimenti applichiamo la matrice di scala necessaria.
         if zoom_attuale < zoom_minimo_richiesto:
             fattore_da_applicare = zoom_minimo_richiesto / zoom_attuale
             self.scale(fattore_da_applicare, fattore_da_applicare)
 
-            # Opzionale: centra la vista al centro della slide dopo lo zoom
             self.centerOn(self.sceneRect().center())
 
     def resizeEvent(self, event):
         """Se la finestra cambia dimensione, aggiorna il limite minimo di zoom"""
-        # Se eravamo al minimo (vista intera), manteniamo la vista intera
         al_minimo = (abs(self.transform().m11() - self.min_zoom) < 0.001)
 
-        # Ricalcoliamo il nuovo limite basato sulla nuova dimensione del widget
         if self.sceneRect().isValid():
-            # Calcoliamo temporaneamente quanto sarebbe lo zoom per il fit
             rect_view = self.viewport().rect()
             sc_w = rect_view.width() / self.sceneRect().width()
             sc_h = rect_view.height() / self.sceneRect().height()
