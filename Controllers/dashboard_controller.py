@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QMessageBox
+import random
 
 class ProjectDashboardController:
     """
@@ -25,7 +26,7 @@ class ProjectDashboardController:
 
     def aggiorna_vista(self):
         """
-        Estrae l'ultimo stato noto del JSON dal Model e lo inietta nella View
+        Prendo l'ultimo stato noto del JSON dal Model e lo inietta nella View
         """
         if not self.model or not self.model.data:
             print("[DEBUG - ERROR] Dashboard: Nessun dato di progetto trovato nel Model.")
@@ -39,6 +40,9 @@ class ProjectDashboardController:
     # ==========================================
 
     def gestisci_avvio_etichettatura(self):
+        """
+        Controllo di sicurezza pre sessione di etichettatura
+        """
         case_id = self.model.data.get('case_id', 'Sconosciuto')
         print(f"[DEBUG - DASHBOARD] Avvio sessione di etichettatura per il progetto: {case_id}")
 
@@ -60,11 +64,10 @@ class ProjectDashboardController:
 
     def gestisci_cambio_campionamento(self, nuova_perc: int):
         """
-        Ricalcola il campionamento consentendo sia aumenti che diminuzioni incrementali,
-        inserendo un warning bloccante se l'utente scende sotto la quota di patch già lavorate.
+        Ricalcola il campionamento in base alla nuova percentuale di campionamento.
+        Blocco di sicurezza se l'utente scende sotto la soglia delle patch che ha già lavorato o visualizzato
+        per non corrompere il database.
         """
-        from PySide6.QtWidgets import QMessageBox  # Import locale di sicurezza per PySide6
-
         data = self.model.data
         patch_list = data.get("patches", [])
 
@@ -73,10 +76,9 @@ class ProjectDashboardController:
 
         totale_assoluto = len(patch_list)
 
-        # Calcoliamo il nuovo traguardo teorico richiesto dall'utente
         nuovo_target = max(1, int(totale_assoluto * (nuova_perc / 100.0))) if totale_assoluto > 0 else 0
 
-        # Identifichiamo le patch intoccabili (già etichettate, saltate o mostrate a schermo)
+        # Identifichiamo le patch intoccabili (già etichettate o mostrate a schermo)
         intoccabili = [p for p in patch_list if p.get("status") in ["labeled", "skipped"] or p.get("shown_to_user")]
         quante_intoccabili = len(intoccabili)
 
@@ -84,7 +86,7 @@ class ProjectDashboardController:
         # CONTROLLO LIMITI DI SICUREZZA
         # =====================================================================
         if nuovo_target < quante_intoccabili:
-            # Calcoliamo matematicamente qual è la percentuale minima reale in questo preciso istante
+            # Calcolo matematicamente la percentuale minima ammissibile
             perc_minima_richiesta = int((quante_intoccabili / totale_assoluto) * 100)
             if (quante_intoccabili * 100) % totale_assoluto != 0:
                 perc_minima_richiesta += 1
@@ -97,7 +99,10 @@ class ProjectDashboardController:
                 f"Per non perdere il lavoro svolto, la percentuale minima consentita attuale è del {perc_minima_richiesta}%."
             )
 
+            # Blocco i segnali per evitare un loop infinito quando imposto il nuovo valore nello SpinBox
+            self.view.spin_perc.blockSignals(True)
             self.view.spin_perc.setValue(perc_minima_richiesta)
+            self.view.spin_perc.blockSignals(False)
 
             self.aggiorna_vista()
             return
@@ -107,15 +112,13 @@ class ProjectDashboardController:
         quante_campionate_ora = len(attuali_campionate)
         ordine = data.get("sampling_config", {}).get("ordine", "Sequenziale")
 
-        # CASO AUMENTO
+        # CASO AUMENTO CAMPIONAMENTO
         if nuovo_target > quante_campionate_ora:
             candidati_da_aggiungere = [p for p in patch_list if not p.get("is_sampled")]
-            quante_da_aggiungere = nuovo_target - quante_campionate_ora
-            quante_da_aggiungere = min(quante_da_aggiungere, len(candidati_da_aggiungere))
+            quante_da_aggiungere = min(nuovo_target - quante_campionate_ora, len(candidati_da_aggiungere))
 
             if quante_da_aggiungere > 0:
                 if ordine == "Random":
-                    import random
                     da_attivare = random.sample(candidati_da_aggiungere, quante_da_aggiungere)
                 else:
                     da_attivare = candidati_da_aggiungere[:quante_da_aggiungere]
@@ -124,15 +127,13 @@ class ProjectDashboardController:
                     p["is_sampled"] = True
                 print(f"[DEBUG] Aggiunte {quante_da_aggiungere} nuove patch al campionamento.")
 
-        # CASO DIMINUZIONE
+        # CASO RIDUZIONE CAMPIONAMENTO
         elif nuovo_target < quante_campionate_ora:
             candidati_da_rimuovere = [p for p in attuali_campionate if p not in intoccabili]
-            quante_da_rimuovere = quante_campionate_ora - nuovo_target
-            quante_da_rimuovere = min(quante_da_rimuovere, len(candidati_da_rimuovere))
+            quante_da_rimuovere = min(quante_campionate_ora - nuovo_target, len(candidati_da_rimuovere))
 
             if quante_da_rimuovere > 0:
                 if ordine == "Random":
-                    import random
                     da_disattivare = random.sample(candidati_da_rimuovere, quante_da_rimuovere)
                 else:
                     da_disattivare = candidati_da_rimuovere[-quante_da_rimuovere:]
@@ -141,7 +142,7 @@ class ProjectDashboardController:
                     p["is_sampled"] = False
                 print(f"[DEBUG] Rimosse {quante_da_rimuovere} patch non lavorate in eccedenza.")
 
-        # Scrittura finale nel JSON e salvataggio
+        # Scrittura mpdifiche nel JSON e salvataggio
         if "sampling_config" not in data:
             data["sampling_config"] = {}
         data["sampling_config"]["sampling_percentage"] = nuova_perc
@@ -152,9 +153,12 @@ class ProjectDashboardController:
         self.aggiorna_vista()
 
     def gestisci_ritorno_home(self):
+        """
+        Uscita dalla Dashboard e ritorno alla schermata Home
+        """
         print("[DEBUG - DASHBOARD] Ritorno alla Home richiesto dall'utente.")
 
         if self.naviga_a_home:
             self.naviga_a_home()
         else:
-            raise ValueError("[ARCHITETTURA] Errore: Callback 'naviga_a_home' non iniettata!")
+            raise ValueError("Errore: Callback 'naviga_a_home' non iniettata!")

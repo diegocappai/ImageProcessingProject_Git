@@ -10,7 +10,6 @@ class HomeController:
         self.model = model
         self.view = view
 
-        # Funzioni iniettate per gestire i cambi schermata
         self.on_nuovo_progetto = on_nuovo_progetto
         self.on_carica_progetto = on_carica_progetto
 
@@ -37,7 +36,7 @@ class HomeController:
         if self.on_nuovo_progetto:
             self.on_nuovo_progetto()
         else:
-            raise ValueError("[ARCHITETTURA] Errore: Callback 'on_nuovo_progetto' non iniettata!")
+            raise ValueError("Errore: Callback 'on_nuovo_progetto' non iniettata!")
 
     def sfoglia_e_carica_progetto(self):
         """
@@ -50,7 +49,7 @@ class HomeController:
 
     def valida_e_carica(self, cartella):
         """
-        Validazione strutturale: prima di passare al MainController, ci assicuriamo che la cartella scelta sia un progetto compatibile
+        Validazione: controllo che la cartella scelta contenga un progetto valido.
         """
         if self.model.is_progetto_valido(cartella):
             print(f"[DEBUG - HOME] Successo: Progetto valido trovato in {cartella}")
@@ -66,13 +65,13 @@ class HomeController:
                 raise ValueError("[ARCHITETTURA] Errore: Callback 'on_carica_progetto' non iniettata!")
 
         else:
-            # Gestione Errore Utente
+            # Gestione Errore Validazione
             QMessageBox.warning(
                 self.view,
                 "Errore Caricamento",
-                "La cartella selezionata non è un progetto valido.\nAssicurati che contenga un file JSON dei metadati."
+                "La cartella selezionata non è un progetto valido.\nAssicurati che contenga un file JSON dei metadati valido."
             )
-            # Se la cartella era nella lista dei recenti la rimuoviamo per mantenere pulita la cronologia.
+            # Se la cartella non valida era nella lista dei recenti la rimuoviamo per mantenere pulita la cronologia.
             self.model.rimuovi_progetto(cartella)
             self.aggiorna_view()
 
