@@ -110,7 +110,7 @@ class ProjectDashboardController:
 
         attuali_campionate = [p for p in patch_list if p.get("is_sampled")]
         quante_campionate_ora = len(attuali_campionate)
-        ordine = data.get("sampling_config", {}).get("ordine", "Sequenziale")
+        ordine = data.get("sampling_config", {}).get("ordine", "sequential")
 
         # CASO AUMENTO CAMPIONAMENTO
         if nuovo_target > quante_campionate_ora:

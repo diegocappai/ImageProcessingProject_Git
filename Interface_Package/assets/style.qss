@@ -1,53 +1,28 @@
-/* --- Sfondo Globale --- */
-QMainWindow, QDialog, QStackedWidget {
-    background-color: #1e1e1e;
-    color: #f0f0f0;
+/* =========================================
+   SFONDO GLOBALE E FONT BASE
+   ========================================= */
+QMainWindow, QDialog, QStackedWidget, QWidget, QPushButton, QLabel {
     font-family: "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
 }
 
-/* --- Label globali --- */
+/* Sfondo grigio scuro classico per le finestre principali */
+QMainWindow, QDialog, QStackedWidget {
+    background-color: #2d2d2d;
+    color: #f0f0f0;
+}
+
 QLabel {
     color: #f0f0f0;
     font-size: 13px;
 }
 
 /* =========================================
-   BOTTONI HERO (HOME VIEW)
+   STILE BOTTONI (Gerarchia rispettata)
    ========================================= */
 
-QPushButton[class="HeroButton"] {
-    background-color: #252526;
-    color: #f0f0f0;
-    border: 2px solid #3c3c3c;
-    border-radius: 12px;
-    padding: 20px;
-
-    font-size: 20px;
-
-    font-weight: bold;
-    text-align: center;
-}
-
-/* --- Bottoni Primari (Salva, Crea, Avanti) --- */
-QPushButton[class="PrimaryButton"] {
-    background-color: #007acc;
-    color: white;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: bold;
-    border: none;
-}
-QPushButton[class="PrimaryButton"]:hover {
-    background-color: #5c9cdf;
-}
-QPushButton[class="PrimaryButton"]:disabled {
-    background-color: #333333;
-    color: #777777;
-}
-
-/* --- Bottoni Secondari (Annulla, Home, ecc) --- */
+/* --- Stile Base per tutti i bottoni secondari --- */
 QPushButton {
-    background-color: #3c3c3c;
+    background-color: #3c3c3c; /* Grigio medio per i bottoni normali */
     color: #f0f0f0;
     border-radius: 6px;
     padding: 8px 16px;
@@ -58,256 +33,294 @@ QPushButton:hover {
     border: 1px solid #777777;
 }
 
-/* --- Input e ComboBox --- */
+/* --- Bottoni Hero (Home View) --- */
+QPushButton[class="HeroButton"] {
+    background-color: #3c3c3c;
+    border: 2px solid #555555;
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+QPushButton[class="HeroButton"]:hover {
+    background-color: #444444;
+    border: 2px solid #d32f2f; /* Bordo rosso al passaggio del mouse */
+}
+
+/* --- Bottoni Primari (Salva, Crea, Avanti) --- */
+QPushButton[class="PrimaryButton"] {
+    background-color: #d32f2f; /* Rosso Principale */
+    color: white;
+    border: none;
+    font-weight: bold;
+}
+QPushButton[class="PrimaryButton"]:hover {
+    background-color: #e53935; /* Rosso più chiaro al passaggio */
+}
+QPushButton[class="PrimaryButton"]:disabled {
+    background-color: #333333;
+    color: #777777;
+}
+
+/* --- Bottoni di Navigazione (Precedente/Successivo) --- */
+QPushButton[class="NavButton"] {
+    background-color: #3c3c3c;
+    color: #aaaaaa;
+    border: none;
+    border-radius: 4px;
+    padding: 8px;
+}
+QPushButton[class="NavButton"]:hover {
+    background-color: #d32f2f; /* Diventa rosso quando ci passi sopra */
+    color: white;
+}
+QPushButton[class="NavButton"]:disabled {
+    background-color: #2d2d2d;
+    color: #555555;
+}
+
+/* --- Bottoncini piccoli per strumenti --- */
+QPushButton[class="SmallToolButton"] {
+    background-color: #3c3c3c;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+QPushButton[class="SmallToolButton"]:hover {
+    background-color: #4a4a4a;
+}
+
+/* =========================================
+   INPUT, COMBOBOX E NOTE (Più scuri per dare profondità)
+   ========================================= */
 QLineEdit, QComboBox, QTextEdit {
-    background-color: #2d2d30;
+    background-color: #1e1e1e; /* Più scuri dello sfondo finestra per effetto scavo */
     color: #f0f0f0;
-    border: 1px solid #3c3c3c;
+    border: 1px solid #444444;
     border-radius: 4px;
     padding: 6px;
 }
+/* Bordo rosso luminoso quando scrivi dentro un campo */
 QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
-    border: 1px solid #4b8bcf; /* Bordo azzurro quando ci clicchi dentro */
+    border: 1px solid #ef5350;
 }
 
+/* Scrollbar per le TextEdit lunghe (Note) */
+QScrollBar:vertical {
+    border: none;
+    background: #1e1e1e;
+    width: 10px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical {
+    background: #555555;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover { background: #d32f2f; }
 
-/* --- Etichette Titolo (Riutilizzabile in varie View) --- */
+/* =========================================
+   COMPONENTI CONDIVISI
+   ========================================= */
+
+/* --- Titoli Sezioni --- */
 QLabel[class="SectionTitle"] {
-    color: #aaaaaa;
+    color: #cccccc;
     font-size: 16px;
     font-weight: bold;
     letter-spacing: 1px;
 }
 
-/* --- Liste (QListWidget per i Progetti Recenti) --- */
-QListWidget {
-    background-color: #151515;
-    color: #dddddd;
-    font-size: 14px;
-    border: 1px solid #333333;
-    border-radius: 6px;
-    padding: 5px;
-}
-QListWidget::item {
-    padding: 8px;
-    border-bottom: 1px solid #222222;
-}
-QListWidget::item:selected {
-    background-color: #4b8bcf;
-    color: white;
-    border-radius: 4px;
-}
-QListWidget::item:hover:!selected {
-    background-color: #222222;
-    border-radius: 4px;
-}
-
 /* --- Menu Contestuale Globale --- */
 QMenu {
-    background-color: #333333;
+    background-color: #3c3c3c;
     color: white;
     border: 1px solid #555555;
 }
 QMenu::item {
-    padding: 6px 25px; /* Spazio per far respirare il testo */
+    padding: 6px 25px;
 }
-/* Creiamo un ID specifico per i menù "pericolosi" (es. Elimina) */
+QMenu::item:selected {
+    background-color: #d32f2f; /* Selezione riga menu in rosso */
+}
 QMenu#MenuElimina::item:selected {
-    background-color: #b80f0a;
-    color: white;
-}
-
-
-/* =========================================
-   VISTA ETICHETTATURA (Labeling View)
-   ========================================= */
-
-/* Bottone a tendina "Etichette" */
-QPushButton[class="MenuDropdownBtn"] {
-    background-color: transparent;
-    color: white;
-    border: none;
-    font-size: 13px;
-    text-align: left;
-    padding: 5px;
-}
-QPushButton[class="MenuDropdownBtn"]::menu-indicator {
-    image: none; /* Nasconde la freccetta brutta di default */
-}
-QPushButton[class="MenuDropdownBtn"]:hover {
-    background-color: #3c3c3c;
-    border-radius: 4px;
-}
-
-
-/* Bottoni di Navigazione (Precedente/Successivo) */
-QPushButton[class="NavButton"] {
-    background-color: #3c3c3c;
-    color: #aaaaaa;
-    border-radius: 4px;
-    padding: 8px;
-}
-QPushButton[class="NavButton"]:hover {
-    background-color: #4a4a4a;
-    color: white;
-}
-QPushButton[class="NavButton"]:disabled {
-    background-color: #1e1e1e;
-    color: #444444;
-    border: 1px solid #333333;
-}
-
-/* Label del contatore (es. 1 di 100) */
-QLabel[class="CounterLabel"] {
-    color: #aaaaaa;
-    font-size: 12px;
-}
-
-/* Bottoni Etichette (Normal, Tumor, Custom) */
-QPushButton[class="LabelButton"] {
-    background-color: #1e1e1e; /* Scuro, non distrae dall'immagine */
-    color: #aaaaaa; /* Testo spento */
-    border: 2px solid #444444; /* Bordo spesso ma neutro */
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 15px;
-    font-weight: bold;
-}
-
-/* Quando ci passi sopra col mouse (ma non è premuto) */
-QPushButton[class="LabelButton"]:hover {
-    border: 2px solid #666666;
-    color: #ffffff;
-    background-color: #2a2a2a;
-}
-
-
-QPushButton[class="LabelButton"]:checked {
-    background-color: #4b8bcf;
-    border: 2px solid #4b8bcf;
-    color: white;
-}
-
-/* Area Note */
-QTextEdit[class="NoteInput"] {
-    background-color: #2d2d30;
-    color: white;
-    border: 1px solid #444444;
-    border-radius: 4px;
-    padding: 8px;
-    font-style: normal;
-}
-QTextEdit[class="NoteInput"]:focus {
-    border: 1px solid #4b8bcf;
+    background-color: #8b0000; /* Rosso scuro sangue per l'eliminazione */
 }
 
 /* =========================================
-   VISTA DASHBOARD
+   VISTA DASHBOARD E TABELLE
    ========================================= */
 
 /* Sfondo delle Card */
 QFrame[class="Card"] {
-    background-color: #252526;
+    background-color: #3c3c3c; /* Si stacca dal grigio #2d2d2d dello sfondo */
     border-radius: 12px;
-    border: 1px solid #1e1e1e;
-    border-top: 1px solid #3c3c3c;
+    border: 1px solid #555555;
 }
 
-/* Titolo principale del Progetto */
 QLabel[class="HeaderTitle"] {
     color: white;
     font-size: 26px;
     font-weight: bold;
 }
 
-/* Etichette Informative */
 QLabel[class="InfoLabel"] {
-    color: #999999;
-    font-size: 13px;
+    color: #bbbbbb;
     letter-spacing: 0.5px;
 }
 
 QLabel[class="InfoValue"] {
-    color: #ffffff;
-    font-size: 13px;
     font-weight: bold;
-    background-color: #333333;
+    background-color: #2d2d2d;
     padding: 4px 12px;
     border-radius: 6px;
-    border: 1px solid #444444;
-}
-
-/* Bottone Indietro */
-QPushButton#BtnBack {
-    background-color: transparent;
-    color: #aaaaaa;
     border: 1px solid #555555;
-    border-radius: 6px;
-    padding: 8px 15px;
-    font-size: 13px;
-}
-QPushButton#BtnBack:hover {
-    background-color: #3c3c3c;
-    color: white;
 }
 
 /* Barra di Progresso */
 QProgressBar {
-    background-color: #333333;
-    color: white;
-    border: none;
+    background-color: #1e1e1e;
+    border: 1px solid #444444;
     border-radius: 6px;
     min-height: 18px;
     text-align: center;
+    color: white;
 }
+/* La parte che si riempie è Rossa */
 QProgressBar::chunk {
-    background-color: #4b8bcf;
+    background-color: #d32f2f;
+    border-radius: 5px;
+}
+
+/* Tabelle della Dashboard */
+QTableWidget {
+    background-color: #3c3c3c;
+    color: #f0f0f0;
+    border: 1px solid #555555;
     border-radius: 6px;
+    gridline-color: #555555;
+    selection-background-color: #d32f2f; /* Selezione riga in rosso */
+}
+QHeaderView::section {
+    background-color: #2d2d2d;
+    color: #cccccc;
+    padding: 5px;
+    border: none;
+    border-bottom: 1px solid #555555;
+    font-weight: bold;
+}
+
+/* =========================================
+   VISTA ETICHETTATURA (Labeling View)
+   ========================================= */
+
+QLabel[class="CounterLabel"] {
+    color: #cccccc;
+    font-size: 12px;
+}
+
+/* Bottoni Etichette (Normal, Tumor, Custom) */
+QPushButton[class="LabelButton"] {
+    background-color: #3c3c3c;
+    color: #cccccc;
+    border: 2px solid #555555;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: bold;
+}
+QPushButton[class="LabelButton"]:hover {
+    border: 2px solid #888888;
+    color: #ffffff;
+    background-color: #4a4a4a;
+}
+/* Quando il bottone dell'etichetta è "Schiacciato" / Attivo */
+QPushButton[class="LabelButton"]:checked {
+    background-color: #d32f2f;
+    border: 2px solid #ef5350;
+    color: white;
+}
+
+/* Bottone a tendina "Etichette" */
+QPushButton[class="MenuDropdownBtn"] {
+    background-color: transparent;
+    color: white;
+    border: none;
+    text-align: left;
+    padding: 5px;
+}
+QPushButton[class="MenuDropdownBtn"]::menu-indicator {
+    image: none;
+}
+QPushButton[class="MenuDropdownBtn"]:hover {
+    background-color: #3c3c3c;
+}
+
+/* =========================================
+   LISTE (HOME VIEW RECENTI)
+   ========================================= */
+QListWidget {
+    background-color: #1e1e1e; /* Più scuro per fare l'effetto rientrante */
+    color: #dddddd;
+    font-size: 14px;
+    border: 1px solid #444444;
+    border-radius: 6px;
+    padding: 5px;
+}
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #333333;
+}
+QListWidget::item:selected {
+    background-color: #d32f2f; /* Progetto selezionato in rosso */
+    color: white;
+    border-radius: 4px;
+}
+QListWidget::item:hover:!selected {
+    background-color: #2d2d2d;
+    border-radius: 4px;
 }
 
 /* =========================================
    VISTA IMPOSTAZIONI SLIDE & ROI
    ========================================= */
+QLabel[class="InstructionLabel"] { color: #bbbbbb; font-size: 11px; }
+QLabel[class="HighlightLabel"] { color: #ef5350; font-weight: bold; } /* Testo Rosso Acceso */
 
-/* Label Istruzioni e Highlight */
-QLabel[class="InstructionLabel"] { color: #aaaaaa; font-size: 11px; }
-QLabel[class="HighlightLabel"] { color: #4b8bcf; font-weight: bold; }
-
-/* Icona Info */
 QLabel[class="InfoBadge"] {
-    background-color: #4b8bcf;
+    background-color: #d32f2f; /* Badge Rosso */
     color: white;
     border-radius: 8px;
     font-family: "Times New Roman", serif;
     font-weight: bold;
     font-size: 11px;
 }
-QLabel[class="InfoBadge"]:hover { background-color: #5c9cdf; }
-
-/* Bottoncini piccoli per strumenti */
-QPushButton[class="SmallToolButton"] {
-    background-color: #333333;
-    color: white;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 11px;
-}
-QPushButton[class="SmallToolButton"]:hover { background-color: #4a4a4a; }
 
 /* =========================================
-            QMESSAGEBOX
+   QMESSAGEBOX (Popup)
    ========================================= */
-
+QMessageBox {
+    background-color: #2d2d2d;
+}
 QMessageBox QPushButton {
     min-width: 80px;
-    height: 32px; /* LA MAGIA: Forza la stessa altezza per tutti i bottoni */
+    height: 32px;
     margin: 0px;
-    padding: 0px 15px; /* Riduciamo il padding verticale rispetto agli altri bottoni */
-    outline: none; /* Uccide l'anello di focus invisibile di Windows */
+    padding: 0px 15px;
+    outline: none;
+}
+QMessageBox QPushButton:default {
+    border: 2px solid #d32f2f; /* Bordo rosso per il bottone principale di default (es. OK) */
+    background-color: #3c3c3c;
+}
+QMessageBox QPushButton:default:hover {
+    background-color: #d32f2f;
 }
 
-/* Stile per il bottone preselezionato (Default) */
-QMessageBox QPushButton:default {
-    border: 2px solid #4b8bcf;
-    background-color: #2d2d30;
-}
+/* =========================================
+   STATI DINAMICI (Nuovi progetti)
+   ========================================= */
+QLabel[class="StatusLabel_Neutral"] { color: #888888; font-style: italic; }
+QLabel[class="StatusLabel_Success"] { color: #4caf50; font-weight: bold; } /* Verde scuro */
+QLabel[class="StatusLabel_Warning"] { color: #ff9800; font-weight: bold; } /* Arancione scuro */
+QLabel[class="StatusLabel_Error"]   { color: #ef5350; font-weight: bold; } /* Rosso acceso */

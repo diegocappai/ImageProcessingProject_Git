@@ -3,19 +3,22 @@ from Interface_Package.views.setting_new_slide_view import ImpostazioniSlideDial
 
 class SetupSlideController:
     """
-    Controller per il Setup dei progetti Whole Slide Image (WSI)
+    Controller per il Setup dei nuovi progetti Whole Slide Image (WSI)
     """
 
     def __init__(self, model, view: ImpostazioniSlideDialog):
+        # Inizializzo il Model e la View
         self.model = model
         self.view = view
+
+        # Flag per capire se l'utente ha confermato
         self.configurazione_salvata = False
 
         self.collega_segnali()
         self._inizializza_vista_slide()
 
     def collega_segnali(self):
-        """Mappa gli eventi causati dall'utente"""
+        """Mappa gli eventi generati dall'utente con i metodi interni"""
         self.view.aggiorna_grandezza_patch.connect(self.gestisci_cambio_grandezza)
         self.view.accepted.connect(self.salva_configurazione)
         self.view.griglia_toggled.connect(self.gestisci_visibilita_griglia)
@@ -26,7 +29,7 @@ class SetupSlideController:
 
         self.view.roi_view.imposta_motore_immagini(self.model.manager)
 
-        # Il Model deve sapere le dimensioni originali per i calcoli successivi
+        # Inietto al model le dimensioni originali per i calcoli successivi
         self.model.larghezza_originale = self.model.manager.width
         self.model.altezza_originale = self.model.manager.height
 
@@ -34,15 +37,21 @@ class SetupSlideController:
         self.gestisci_cambio_grandezza(valore_iniziale)
 
     def gestisci_visibilita_griglia(self, stato_checked):
+        """Accendo o spengo la griglia visiva in base alla checkbox dell'utente"""
         self.view.set_griglia_visiva(stato_checked)
 
     def gestisci_cambio_grandezza(self, nuova_grandezza):
-        """Aggiorna il disegno della griglia verde quando l'utente cambia risoluzione"""
+        """
+        Aggiorna il disegno della griglia verde quando l'utente cambia grandezza patch.
+        Ricalcolo quante patch entrerebbero teoricamente nell'intera slide e aggiorno la UI.
+        """
         self.model.imposta_grandezza_patch(nuova_grandezza)
 
+        # Mostro all'utente il numero massimo teorico di patch (se selezionasse tutta la slide)
         totale_teorico = self.model.calcola_patch_totali()
         self.view.aggiorna_totale_patch(f"{totale_teorico} (Max Teorico)")
 
+        # Passo alla View le proporzioni tra l'immagine originale e la miniatura a schermo.
         self.view.orig_w = self.model.larghezza_originale
         self.view.orig_h = self.model.altezza_originale
 
@@ -54,24 +63,18 @@ class SetupSlideController:
 
     def salva_configurazione(self):
         """
-        Motore di Mappatura Spaziale:
-        Traspone le ROI disegnate dall'utente sulla miniatura in coordinate
-        assolute basate sulle dimensioni della vera Whole Slide Image
+        Preparo il setup per le ROI e inietto i parametri di base nel Model.
         """
         grandezza_patch = self.view.get_grandezza_patch()
 
-        # Aggiornamento Model
+        # Inzializzo la lista delle ROI vuota
         self.model.roi_list = []
         self.model.imposta_grandezza_patch(grandezza_patch)
 
         if hasattr(self.model, 'imposta_parametri_comuni'):
-            self.model.imposta_parametri_comuni("100%", "Sequenziale")
+            self.model.imposta_parametri_comuni("100%", "sequential")
 
         print("[DEBUG - SETUP SLIDE] Configurazione base salvata. Pronti per la Dashboard.")
-        self.configurazione_salvata = True
-
-
-
         self.configurazione_salvata = True
 
     def esegui(self):

@@ -1,4 +1,3 @@
-import os
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtWidgets import (QWidget, QLabel, QPushButton, QHBoxLayout,
                                QProgressBar, QVBoxLayout, QTableWidget, QTableWidgetItem,
@@ -11,6 +10,10 @@ from Interface_Package.widgets.roi_graphics_view import RoiGraphicsView
 
 
 class NewProjectDashboardView(QWidget):
+    """
+    View della Dashboard per le WSI (Whole Slide Image)
+    """
+
     # ==========================================
     # SEGNALI
     # ==========================================
@@ -38,9 +41,12 @@ class NewProjectDashboardView(QWidget):
         # --- HEADER ---
         header_layout = QHBoxLayout()
         self.lbl_project_name = QLabel("Nome Progetto")
-        self.lbl_project_name.setStyleSheet("font-size: 22px; font-weight: bold;")
+        self.lbl_project_name.setProperty("class","HeaderTitle")
+
         self.btn_back = QPushButton("← Torna alla Home")
+        self.btn_back.setObjectName("BtnBack")
         self.btn_back.clicked.connect(self.richiesta_ritorno_home.emit)
+
         header_layout.addWidget(self.lbl_project_name)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_back)
@@ -55,7 +61,7 @@ class NewProjectDashboardView(QWidget):
         left_layout.setContentsMargins(0, 10, 10, 0)
 
         map_title = QLabel("Panoramica Slide e Etichette")
-        map_title.setStyleSheet("font-weight: bold; font-size: 14px; color: red;")
+        map_title.setProperty("class", "SectionTitle")
         left_layout.addWidget(map_title)
 
         # Integriamo la View per la Minimappa
@@ -86,7 +92,7 @@ class NewProjectDashboardView(QWidget):
 
         # Tabella ROI
         roi_title = QLabel("Gestione ROI")
-        roi_title.setStyleSheet("font-weight: bold; font-size: 14px; color: red;")
+        roi_title.setProperty("class", "SectionTitle")
         right_layout.addWidget(roi_title)
 
         self.table_rois = QTableWidget()
@@ -123,28 +129,13 @@ class NewProjectDashboardView(QWidget):
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
-        stile_rosso = """
-                            QProgressBar {
-                                border: 1px solid ;
-                                border-radius: 4px;
-                                text-align: center;
-                                background-color: ;
-                                color: white;
-                                font-weight: bold;
-                            }
-                            QProgressBar::chunk {
-                                background-color: #d32f2f;
-                                border-radius: 3px;
-                            }
-                        """
-        self.progress_bar.setStyleSheet(stile_rosso)
         right_layout.addWidget(self.progress_bar)
 
         # Azioni
         action_layout = QHBoxLayout()
 
         self.btn_main_action = QPushButton("Etichetta")
-        self.btn_main_action.setStyleSheet("background-color: #0078d7; color: white; font-weight: bold; padding: 10px;")
+        self.btn_main_action.setProperty("class", "PrimaryButton")
         self.btn_main_action.clicked.connect(self._invia_richiesta_etichettatura)
 
         action_layout.addStretch()
@@ -163,7 +154,7 @@ class NewProjectDashboardView(QWidget):
     # ==========================================
 
     def disegna_mappa_annotazioni(self, data: dict):
-        """Assegna un colore fisso per classe e disegna le patch"""
+        """Assegna un colore fisso per classe e disegna le patch annotate"""
         for item in self.patch_graphics_items:
             if item.scene():
                 item.scene().removeItem(item)
@@ -171,7 +162,6 @@ class NewProjectDashboardView(QWidget):
 
         color_map_ui = data.get("color_map_generata", {})
         classi_progetto = data.get("labeling_config", {}).get("classes", [])
-
         self.color_map = color_map_ui
 
         patches = data.get("patches", [])
@@ -219,7 +209,7 @@ class NewProjectDashboardView(QWidget):
         self._aggiorna_legenda(classi_progetto)
 
     def _aggiorna_legenda(self, etichette: list):
-        """Crea la legenda sotto la mappa"""
+        """Crea la legenda dinamica sotto la mappa"""
         while self.layout_legenda.count():
             item = self.layout_legenda.takeAt(0)
             if item.widget():
@@ -253,7 +243,6 @@ class NewProjectDashboardView(QWidget):
         if not item:
             return
 
-        from PySide6.QtWidgets import QGraphicsSimpleTextItem, QGraphicsRectItem
         if isinstance(item, QGraphicsSimpleTextItem) and item.parentItem():
             item = item.parentItem()
 
@@ -270,10 +259,7 @@ class NewProjectDashboardView(QWidget):
             return
 
         menu = QMenu(self)
-        menu.setStyleSheet("""
-                    QMenu { background-color: #222; color: white; border: 1px solid #555; }
-                    QMenu::item:selected { background-color: #0078d7; }
-                """)
+        menu.setObjectName("MenuElimina")
 
         azione_elimina = QAction("❌ Elimina ROI", self)
         azione_elimina.triggered.connect(lambda: self.richiesta_eliminazione_roi.emit(roi_id_cliccato))
@@ -297,9 +283,6 @@ class NewProjectDashboardView(QWidget):
         rects = self.minimap_view.get_roi_rects()
         self.nuova_roi_disegnata.emit(rects)
 
-    def _on_cambio_percentuale(self, roi_id: str, nuovo_valore: str):
-        self.cambio_percentuale_roi.emit(roi_id, int(nuovo_valore.replace("%", "")))
-
     def display_project(self, data: dict):
         """Popola UI, Tabella e Minimappa"""
         self.lbl_project_name.setText(f"Progetto: {data.get('case_id', 'Unnamed')}")
@@ -322,21 +305,6 @@ class NewProjectDashboardView(QWidget):
             item.setTextAlignment(allineamento)
             return item
 
-        stile_rosso = """
-                    QProgressBar {
-                        border: 1px solid ;
-                        border-radius: 4px;
-                        text-align: center;
-                        background-color: ;
-                        color: white;
-                        font-weight: bold;
-                    }
-                    QProgressBar::chunk {
-                        background-color: #d32f2f;
-                        border-radius: 3px;
-                    }
-                """
-
 
         for row, roi in enumerate(roi_list):
             roi_id = roi.get("id", f"ROI_{row + 1}")
@@ -354,7 +322,7 @@ class NewProjectDashboardView(QWidget):
             perc_camp = int((labeled / sampled) * 100) if sampled > 0 else 0
             perc_tot = int((labeled / total_valid) * 100) if total_valid > 0 else 0
 
-            # --- PARTE 1: COMPONENTI INTERATTIVI ---
+            # --- COMPONENTI INTERATTIVI ---
             cb_container = QWidget()
             cb_layout = QHBoxLayout(cb_container)
             cb_layout.setContentsMargins(0, 0, 0, 0)
@@ -374,10 +342,9 @@ class NewProjectDashboardView(QWidget):
 
             def salva_spinbox(rid=roi_id, s=spin, val_iniziale=valore):
                 try:
-                    nuovo_valore = s.value()  # Otteniamo direttamente un numero intero pulito!
+                    nuovo_valore = s.value()
                     if nuovo_valore != val_iniziale:
-                        # Lo passiamo come stringa per mantenere compatibilità col tuo Controller
-                        self._on_cambio_percentuale(rid, str(nuovo_valore))
+                        self.cambio_percentuale_roi.emit(rid, nuovo_valore)
                 except RuntimeError:
                     pass
 
@@ -420,14 +387,13 @@ class NewProjectDashboardView(QWidget):
             # --- POPOLAMENTO TABELLA ---
             self.table_rois.setCellWidget(row, 0, cb_container)
             self.table_rois.setItem(row, 1, crea_cella_readonly(roi_id))
-            self.table_rois.setItem(row, 2, crea_cella_readonly(total_valid))  # FIX BUG VARIABILE
+            self.table_rois.setItem(row, 2, crea_cella_readonly(total_valid))
 
             # Progresso Totale ROI
             bar_tot_roi = QProgressBar()
             bar_tot_roi.setRange(0, 100)
             bar_tot_roi.setValue(perc_tot)
             bar_tot_roi.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            bar_tot_roi.setStyleSheet(stile_rosso)
             self.table_rois.setCellWidget(row, 3, bar_tot_roi)
             self.table_rois.setCellWidget(row, 4, spin)
             self.table_rois.setItem(row, 5, crea_cella_readonly(f"{shown_to_user} / {sampled}"))
@@ -437,7 +403,6 @@ class NewProjectDashboardView(QWidget):
             bar_camp.setRange(0, 100)
             bar_camp.setValue(perc_camp)
             bar_camp.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            bar_camp.setStyleSheet(stile_rosso)
             self.table_rois.setCellWidget(row, 6, bar_camp)
 
         self.minimap_view.imposta_roi_bloccate(rects_bloccati)
@@ -513,7 +478,9 @@ class NewRoiDialog(QDialog):
 
         layout_btn = QHBoxLayout()
         btn_annulla = QPushButton("Annulla")
+
         btn_salva = QPushButton("Salva ROI")
+        btn_salva.setProperty("class", "PrimaryButton")
 
         btn_annulla.clicked.connect(self.reject)
         btn_salva.clicked.connect(self.accept)

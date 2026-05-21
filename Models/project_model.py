@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 class ProjectManager:
     """
-    Mantiene in memoria il dizionario JSON completo del progetto e si occupa di sincronizzarlo in modo sicuro sul disco fisso
+    Mantiene in memoria il dizionario JSON completo del progetto (self.data) e si occupa di sincronizzarlo in modo
+    sicuro sul disco fisso ogni volta che c'è una modifica
     """
 
     def __init__(self):
@@ -23,7 +24,8 @@ class ProjectManager:
 
     def _ricalcola_progress(self):
         """
-        Scansiona l'intero array delle patch e aggiorna il contatore globale del progresso e le statistiche delle singole ROI
+        Scansiona l'intero array delle patch e aggiorna il contatore globale del progresso e le statistiche delle singole ROI.
+        Viene chiamato sempre un attimo prima di salvare per avere le statistiche sempre aggiornate
         """
         if "patches" not in self.data or "progress" not in self.data:
             return
@@ -33,14 +35,17 @@ class ProjectManager:
         saltate = sum(1 for p in self.data["patches"] if p["status"] == "skipped")
         mostrate = sum(1 for p in self.data["patches"] if p.get("shown_to_user", False))
 
+        # Aggiorno i metadati
         self.data["progress"]["total_patches"] = totale
         self.data["progress"]["labeled_patches"] = etichettate
         self.data["progress"]["skipped_patches"] = saltate
         self.data["progress"]["shown_patches"] = mostrate
 
+        # Se non ci sono più "pending" il progetto è completato
         pendenti = sum(1 for p in self.data["patches"] if p["status"] == "pending" and p.get("is_sampled", False))
         self.data["progress"]["completed"] = (pendenti == 0 and totale > 0)
 
+        # Aggiorno anche i contatori delle singole ROI
         if "sampling_config" in self.data and "roi_list" in self.data["sampling_config"]:
             for roi in self.data["sampling_config"]["roi_list"]:
                 roi_id = roi["id"]
@@ -57,32 +62,34 @@ class ProjectManager:
                 roi["stats"]["labeled"] = labeled_in_roi
 
     @staticmethod
-    def genera_indici_campionamento(totale_patch, percentuale, modalita="Random"):
+    def genera_indici_campionamento(totale_patch, percentuale, modalita="random"):
         """
-        Genera gli indici delle patch da mostrare
+        Genera gli indici delle patch da mostrare (campionate).
+        Se la modalità è sequenziale si rispetta l'ordine di lettura (da sx a dx).
+        Se la modalità è random si mischiano in modo casuale.
         """
         if totale_patch == 0:
             return []
 
         if percentuale >= 100:
             indici = list(range(totale_patch))
-            if modalita == "Random":
+            if modalita == "random":
                 random.shuffle(indici)
             return indici
 
+        # Calcolo numero patch da campionare (min 1 patch)
         numero_indici = max(1, int(totale_patch * (percentuale / 100.0)))
 
-        # CAMPIONAMENTO
+        # CAMPIONAMENTO CASUALE
         indici_scelti = random.sample(range(totale_patch), numero_indici)
 
         # ORDINAMENTO
-        if modalita == "Sequential":
+        if modalita == "sequential":
             indici_scelti.sort()
         else:
             random.shuffle(indici_scelti)
 
         return indici_scelti
-
 
     # ==========================================
     # OPERAZIONI DI I/O SU DISCO
@@ -106,17 +113,21 @@ class ProjectManager:
     def carica_progetto_esistente(self, percorso_cartella):
         """
         Esplora la cartella selezionata, individua il file JSON, lo legge e
-        popola l'oggetto self.data in memoria.
+        popola l'oggetto self.data in RAM.
         """
         if not os.path.exists(percorso_cartella):
             print(f"[DEBUG - ERROR] La cartella {percorso_cartella} non esiste più.")
             return False
 
         try:
-            file_json_trovati = [f for f in os.listdir(percorso_cartella) if f.endswith('.json')]
+            # Prendo solo il file principale del progetto
+            file_json_trovati = [f for f in os.listdir(percorso_cartella) if f.endswith('_data.json')]
 
+            # Fallback: se non lo trovo con '_data.json', prendo il primo '.json'
             if not file_json_trovati:
-                return False
+                file_json_trovati = [f for f in os.listdir(percorso_cartella) if f.endswith('.json')]
+                if not file_json_trovati:
+                    return False
 
             nome_file_json = file_json_trovati[0]
             percorso_completo_json = os.path.join(percorso_cartella, nome_file_json)
@@ -124,6 +135,7 @@ class ProjectManager:
             with open(percorso_completo_json, 'r', encoding='utf-8') as file:
                 self.data = json.load(file)
 
+            # Memorizzo i percorsi per i futuri salvataggi
             self.percorso_file_json = percorso_completo_json
             self.percorso_cartella_progetto = percorso_cartella
 
@@ -140,7 +152,7 @@ class ProjectManager:
     def crea_nuovo_progetto(self, cartella_destinazione, nome_progetto, tipo_sorgente, parametri_setup,
                             classi_etichette, dati_calcolati, callback_ui=None):
         """
-        Costruisce l'intero JSON del progetto assemblando i dati pre-calcolati dal Model
+        Costruisce l'intero JSON del progetto assemblando i dati pre-calcolati e salvando tutto su disco
         """
         self.percorso_cartella_progetto = cartella_destinazione
         self.percorso_file_json = os.path.join(self.percorso_cartella_progetto, f"{nome_progetto}_data.json")
@@ -190,6 +202,7 @@ class ProjectManager:
         step_aggiornamento = max(1, totale_patch // 100)
         totale_campionate = 0
 
+        # Popolo massivamente l'array delle immagini (tutte le patches)
         for i, p_dati in enumerate(lista_patch, start=1):
 
             is_sampled = p_dati.get("is_sampled", False)
@@ -214,6 +227,7 @@ class ProjectManager:
                 "reviewed_at": None
             })
 
+            # Aggiorno la barra di progresso
             if callback_ui and i % step_aggiornamento == 0:
                 percentuale_progresso = 30 + int((i / totale_patch) * 60)
                 callback_ui(percentuale_progresso, f"Scrittura patch {i} di {totale_patch}...")
@@ -235,7 +249,7 @@ class ProjectManager:
             print(f"[DEBUG - ERROR] Patch {patch_id} non trovata nel JSON!")
             return
 
-        # Aggiornamento Metadati Comuni
+        # Aggiornamento Metadati
         patch_trovata["annotation_text"] = note if note else None
         patch_trovata["selected_for_review"] = da_rivedere
         patch_trovata["shown_to_user"] = True
@@ -252,7 +266,7 @@ class ProjectManager:
             patch_trovata["status"] = "skipped"
             patch_trovata["reviewed_at"] = None
 
-        # Sincronizzazione sul file system
+        # Sincronizzazione modifica su dsico
         self.salva_su_disco()
 
     def modifica_percentuale_roi(self, roi_id, nuova_percentuale):
@@ -272,15 +286,14 @@ class ProjectManager:
             return False, "Nessuna patch in questa ROI.", nuova_percentuale
 
         patch_attualmente_campionate = [p for p in patch_roi if p.get("is_sampled", False)]
-
         patch_gia_lavorate = [p for p in patch_attualmente_campionate if p["status"] != "pending"]
         totale_lavorate = len(patch_gia_lavorate)
 
         nuovo_target_campionate = max(1, int(totale_valide * (nuova_percentuale / 100.0)))
-
         percentuale_finale_applicata = nuova_percentuale
         messaggio = "Percentuale aggiornata con successo."
 
+        # Blocco di sicurezza
         if nuovo_target_campionate < totale_lavorate:
             nuovo_target_campionate = totale_lavorate
             percentuale_finale_applicata = int((totale_lavorate / totale_valide) * 100)
@@ -289,6 +302,7 @@ class ProjectManager:
         campionate_attuali_count = len(patch_attualmente_campionate)
         delta = nuovo_target_campionate - campionate_attuali_count
 
+        # Se devo aggiungere patch al campionamento
         if delta > 0:
             patch_disponibili = [p for p in patch_roi if not p.get("is_sampled", False)]
             da_aggiungere = random.sample(patch_disponibili, min(delta, len(patch_disponibili)))
@@ -296,6 +310,7 @@ class ProjectManager:
             for p in da_aggiungere:
                 p["is_sampled"] = True
 
+        # Se devo rimuovere patch non lavorate dal campionamento
         elif delta < 0:
             patch_rimovibili = [p for p in patch_attualmente_campionate if p["status"] == "pending"]
             da_rimuovere = random.sample(patch_rimovibili, abs(delta))

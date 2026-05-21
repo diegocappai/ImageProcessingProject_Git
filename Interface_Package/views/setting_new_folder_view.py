@@ -7,7 +7,7 @@ from Utils.ui_settings import CLASSI_DEFAULT
 
 class ImpostazioniDialog(QDialog):
     """
-    View-Controller per la configurazione dei progetti basati su cartelle (Dataset)
+    View per la configurazione dei progetti basati su cartelle (Dataset)
     """
     def __init__(self, n_patches: int, parent=None):
         super().__init__(parent)
@@ -15,8 +15,8 @@ class ImpostazioniDialog(QDialog):
         # Stato iniziale passato dal Controller
         self.n_patches = n_patches
 
-        self.setWindowTitle("Impostazioni input da Cartella")
-        self.setMinimumWidth(400)
+        self.setWindowTitle("Configurazione Progetto - Dataset Folder")
+        self.setFixedSize(500, 450)
 
         self.init_ui()
 
@@ -33,6 +33,7 @@ class ImpostazioniDialog(QDialog):
 
         # Info Dataset
         patch_label = QLabel(f"{self.n_patches} patch valide trovate nella cartella.")
+        patch_label.setProperty("class", "InstructionLabel")
         content_layout.addWidget(patch_label)
 
         # Percentuale di Campionamento
@@ -40,17 +41,18 @@ class ImpostazioniDialog(QDialog):
         perc_label = QLabel("Percentuale di patch da etichettare:")
 
         self.combo_perc = QComboBox()
-        # Generazione dinamica delle opzioni
+        # Generazione dinamica
         self.combo_perc.addItems([f"{i}%" for i in range(10, 101, 10)])
-        self.combo_perc.setCurrentText("30%")
+        self.combo_perc.setCurrentText("50%")
 
         perc_layout.addWidget(perc_label)
         perc_layout.addWidget(self.combo_perc)
         perc_layout.addStretch()
         content_layout.addLayout(perc_layout)
 
-        # Ordinamento
-        order_label = QLabel("Strategia di visualizzazione:")
+        # Ordinamento Visualizzazione
+        order_label = QLabel("Ordine di visualizzazione:")
+        order_label.setProperty("class", "SectionTitle")
         content_layout.addWidget(order_label)
 
         self.radio_seq = QRadioButton("Sequenziale")
@@ -63,9 +65,7 @@ class ImpostazioniDialog(QDialog):
 
         content_layout.addSpacing(10)
 
-        # ---------------------------------------------------------
-        # 🟢 COMPONENTE CLASSI (Approccio Senior)
-        # ---------------------------------------------------------
+        # --- GESTIONE CLASSI ETICHETTE --
         self.class_selector = ClassSelectorWidget(default_classes=CLASSI_DEFAULT)
         content_layout.addWidget(self.class_selector)
 
@@ -76,7 +76,7 @@ class ImpostazioniDialog(QDialog):
         btn_layout.addStretch()
 
         self.btn_annulla = QPushButton("Annulla")
-        self.btn_salva = QPushButton("Salva")
+        self.btn_salva = QPushButton("Salva ed Esegui")
         self.btn_salva.setProperty("class", "PrimaryButton")
 
         self.btn_annulla.clicked.connect(self.reject)
@@ -88,11 +88,18 @@ class ImpostazioniDialog(QDialog):
         content_layout.addLayout(btn_layout)
         main_layout.addLayout(content_layout)
 
+    # ==========================================
+    # API PUBBLICA
+    # ==========================================
 
     def get_classi_etichette(self) -> list:
+        """Metodo pubblico chiamato dal Controller per estrarre le etichette selezionate dall'utente."""
         return self.class_selector.get_selected_classes()
 
     def closeEvent(self, event: QCloseEvent):
+        """
+        Overriding dell'evento di chiusura della finestra
+        """
         box = QMessageBox(self)
         box.setWindowTitle("Conferma Uscita")
         box.setText("Sicuro di voler uscire?\nI parametri del progetto in fase di creazione andranno persi.")

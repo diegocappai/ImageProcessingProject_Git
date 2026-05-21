@@ -26,7 +26,7 @@ class NewProjectDialog(QDialog):
 
         # Nome Progetto
         self.input_name = QLineEdit()
-        self.input_name.setPlaceholderText("Es: Paziente_01_Biopsia")
+        self.input_name.setPlaceholderText("Es: Nuovo_progetto")
         form_layout.addRow("Nome Progetto:", self.input_name)
 
         # Output Path (Destinazione)
@@ -34,6 +34,7 @@ class NewProjectDialog(QDialog):
         self.input_out_path = QLineEdit()
         self.btn_out_path = QPushButton("Sfoglia...")
         self.btn_out_path.clicked.connect(self._browse_output)
+
         out_layout.addWidget(self.input_out_path)
         out_layout.addWidget(self.btn_out_path)
         form_layout.addRow("Salva in:", out_layout)
@@ -54,15 +55,15 @@ class NewProjectDialog(QDialog):
         in_layout.addWidget(self.btn_path_folder)
         form_layout.addRow("Sorgente:", in_layout)
 
-        # Feedback Visivo (Rilevamento Automatico)
+        # Feedback Visivo (Rilevamento Input)
         self.label_detection = QLabel("Tipologia: in attesa di input...")
-        # Stile di default
-        self.label_detection.setStyleSheet("color: gray; font-style: italic;")
+        self.label_detection.setProperty("class", "StatusLabel_Neutral")
         form_layout.addRow("", self.label_detection)
 
         layout.addLayout(form_layout)
+        layout.addStretch()
 
-        # Action Area
+        # --- ACTION AREA (Bottoni finali) ---
         btn_box = QHBoxLayout()
         self.btn_annulla = QPushButton("Annulla")
         self.btn_annulla.clicked.connect(self.reject)  # QDialog.Rejected
@@ -76,19 +77,20 @@ class NewProjectDialog(QDialog):
         btn_box.addWidget(self.btn_crea)
         layout.addLayout(btn_box)
 
-        # Aggiorna l'etichetta in tempo reale mentre l'utente digita o incolla un path
+        # Aggiorna il messaggio mentre l'utente digita o incolla un path
         self.input_in_path.textChanged.connect(self._auto_detect_input)
 
     # ==========================================
     # METODI DI BROWSING
     # ==========================================
     def _browse_output(self):
+        """Apre esplora risorse chiedendo SOLO cartelle"""
         folder = QFileDialog.getExistingDirectory(self, "Seleziona cartella di destinazione", str(Path.home()))
         if folder:
             self.input_out_path.setText(folder)
 
     def _browse_input_file(self):
-        # Filtro per le estensioni WSI più comuni supportate da librerie come OpenSlide/PyVips
+        """Apre esplora risorse filtrando i file per le estensioni compatibili WSI"""
         filtro = "Slide Images (*.tif *.tiff *.svs *.ndpi *.vms *.png *.jpg *jpeg);;Tutti i file (*.*)"
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleziona Slide Istologica", str(Path.home()), filtro)
 
@@ -96,6 +98,7 @@ class NewProjectDialog(QDialog):
             self.input_in_path.setText(file_path)
 
     def _browse_input_folder(self):
+        """Apre esplora risorse chiedendo SOLO cartelle"""
         folder = QFileDialog.getExistingDirectory(self, "Seleziona Cartella Dataset", str(Path.home()))
         if folder:
             self.input_in_path.setText(folder)
@@ -103,45 +106,52 @@ class NewProjectDialog(QDialog):
     # ==========================================
     # LOGICA DI PRESENTAZIONE E VALIDAZIONE UI
     # ==========================================
+    def _imposta_stato_label(self, testo: str, classe_css: str):
+        """
+        Utility per aggiornare in modo pulito l'etichetta di feedback.
+        Rimuove il vecchio stile di Qt per forzare la ricarica della nuova classe CSS.
+        """
+        self.label_detection.setText(testo)
+        self.label_detection.setProperty("class", classe_css)
+        self.label_detection.style().unpolish(self.label_detection)
+        self.label_detection.style().polish(self.label_detection)
+
     def _auto_detect_input(self, path_str: str):
         """
-        Analizza superficialmente il percorso inserito per dare feedback immediato
+        UX avanzata: analizza al volo la stringa inserita e capisce da solo
+        se è un file, una cartella o un percorso sbagliato, bloccando o permettendo l'invio.
         """
         if not path_str:
-            self.label_detection.setText("Tipologia: In attesa di input...")
-            self.label_detection.setStyleSheet("color: gray; font-style: italic;")
+            self._imposta_stato_label("Tipologia: In attesa di input...", "StatusLabel_Neutral")
             self.detected_input_type = None
             return
 
         path = Path(path_str)
 
         if not path.exists():
-            self.label_detection.setText("❌ Errore: Il percorso non esiste nel sistema.")
-            self.label_detection.setStyleSheet("color: #E74C3C; font-weight: bold;")
+            self._imposta_stato_label("❌ Errore: Il percorso non esiste nel sistema.", "StatusLabel_Error")
             self.detected_input_type = None
             return
 
-        # Rilevamento Slide
+        # Controllo se è un file Slide
         if path.is_file():
             estensioni_slide = ['.tif', '.tiff', '.svs', '.ndpi', '.vms', '.png', '.jpg', '.jpeg']
             if path.suffix.lower() in estensioni_slide:
-                self.label_detection.setText("✅ Rilevata: Whole Slide Image (WSI)")
-                self.label_detection.setStyleSheet("color: #2ECC71; font-weight: bold;")
+                self._imposta_stato_label("✅ Rilevata: Whole Slide Image (WSI)", "StatusLabel_Success")
                 self.detected_input_type = "Slide"
             else:
-                self.label_detection.setText("⚠️ Attenzione: Estensione file non standard.")
-                self.label_detection.setStyleSheet("color: #F39C12; font-weight: bold;")
+                self._imposta_stato_label("⚠️ Attenzione: Estensione file non standard.", "StatusLabel_Warning")
                 self.detected_input_type = None
 
-        # Rilevamento Dataset (Cartella)
+        # Controllo se è una Cartella (Dataset Patch)
         elif path.is_dir():
-            self.label_detection.setText("✅ Rilevato: Dataset di Patch (Cartella)")
-            self.label_detection.setStyleSheet("color: #2ECC71; font-weight: bold;")
+            self._imposta_stato_label("✅ Rilevato: Dataset di Patch (Cartella)", "StatusLabel_Success")
             self.detected_input_type = "Dataset"
 
     def _validate_and_accept(self):
         """
-        Esegue i controlli finali sui campi obbligatori prima di passare il l'ggetto al Controller
+        Cattura il click su "Crea Progetto".
+        Verifica che tutti i campi siano compilati e validi prima di chiudere il popup.
         """
         if not self.input_name.text().strip():
             QMessageBox.warning(self, "Campi Incompleti", "Per favore, inserisci un nome per il progetto.")
@@ -152,8 +162,7 @@ class NewProjectDialog(QDialog):
             return
 
         if not self.detected_input_type:
-            QMessageBox.warning(self, "Sorgente Non Valida",
-                                "Assicurati di aver inserito una Slide o una cartella valida.")
+            QMessageBox.warning(self, "Sorgente Non Valida", "Assicurati di aver inserito una Slide o una cartella valida.")
             return
 
         self.accept()
@@ -162,9 +171,7 @@ class NewProjectDialog(QDialog):
     # API PUBBLICA
     # ==========================================
     def get_project_data(self) -> Dict[str, str]:
-        """
-        Restituisce un dizionario formattato con i parametri confermati dall'utente
-        """
+        """Restituisce al Controller il pacchetto di informazioni formattato."""
         return {
             "name": self.input_name.text().strip(),
             "output_path": self.input_out_path.text().strip(),

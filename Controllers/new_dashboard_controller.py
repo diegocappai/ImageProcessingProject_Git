@@ -1,14 +1,19 @@
 from PySide6.QtCore import QRectF
 from PySide6.QtWidgets import QMessageBox, QDialog
+
 from ImageManager_Package import get_manager
 from Interface_Package.views.new_dashboard_view import NewRoiDialog
 from Utils.ui_settings import PALETTE_COLORI
 
+import random
+
 class NewProjectDashboardController:
+    """Controller della Dashboard per progetti WSI (Whole Slide Image)"""
     def __init__(self, project_manager, dashboard_view):
         self.project_manager = project_manager
         self.view = dashboard_view
 
+        # Mappo i segnali generati dall'utente ai metodi
         self.view.cambio_percentuale_roi.connect(self._gestisci_cambio_percentuale)
         self.view.richiesta_inizio_etichettatura.connect(self._on_inizio_etichettatura)
         self.view.richiesta_ritorno_home.connect(self._on_ritorno_home)
@@ -21,24 +26,25 @@ class NewProjectDashboardController:
         self.naviga_a_home = None
 
         self._inizializza_minimappa()
-
         self.aggiorna_vista()
 
     def _inizializza_minimappa(self):
-        """Crea il motore PyVips e lo cede in gestione alla Smart View"""
+        """Crea il motore di estrazione PyVips e lo cede in gestione alla View"""
         source_path = self.project_manager.data.get("source_path")
         source_type = self.project_manager.data.get("source_type")
 
         if source_type in ["whole_image", "Slide"] and source_path:
             try:
                 manager = get_manager('Slide', source_path, tile_w=0, tile_h=0)
-                # Passiamo il testimone alla View! Farà lei il Deep Zoom in autonomia
+                # Passiamo il manager alla View
                 self.view.minimap_view.imposta_motore_immagini(manager)
             except Exception as e:
                 print(f"[DEBUG - ERROR] Impossibile inizializzare il manager per la Dashboard: {e}")
 
     def aggiorna_vista(self):
-        """Passa il dizionario JSON alla UI per disegnare la tabella e i quadratini colorati"""
+        """
+        Estraggo il JSON e lo invio alla UI per ripopolare la tabella
+        """
         data = self.project_manager.data
         classi = data.get("labeling_config", {}).get("classes", [])
 
@@ -48,7 +54,14 @@ class NewProjectDashboardController:
         }
         self.view.display_project({**data, "color_map_generata": color_map_ui})
 
+    # ==========================================
+    # GESTIONE INTERAZIONI UTENTE
+    # ==========================================
+
     def _gestisci_cambio_percentuale(self, roi_id, nuova_percentuale):
+        """
+        Invocato qaundo l'utente cambia il valore della percentuale di campionamento di una ROI
+        """
         successo, messaggio, perc_effettiva = self.project_manager.modifica_percentuale_roi(roi_id, nuova_percentuale)
 
         if not successo:
@@ -59,7 +72,7 @@ class NewProjectDashboardController:
         self.aggiorna_vista()
 
     def _on_inizio_etichettatura(self, roi_selezionate):
-        """Intercetta il click su 'Inizia Etichettatura' e valida lo stato prima di procedere."""
+        """Controlla la validità del progettoprima e lancia la sessione di etichettatura"""
 
         data = self.project_manager.data
         lista_roi = data.get("sampling_config", {}).get("roi_list", [])
@@ -91,115 +104,25 @@ class NewProjectDashboardController:
             self.naviga_a_etichettatura(roi_selezionate)
 
     def _on_ritorno_home(self):
+        """Ritorno alla schemata principale dell'applicazione"""
         if self.naviga_a_home:
             self.naviga_a_home()
 
-    def _processa_new_roi(self, lista_rect_qt):
-        """
-        1. Calcola le patch valide nel rettangolo verde
-        2. Mostra il Dialog per la percentuale
-        3. Se OK, salva nel JSON e ricarica la pagina
-        """
-        if not lista_rect_qt:
-            return
-
-        rect_qt = lista_rect_qt[-1]
-
-        rx, ry = rect_qt.x(), rect_qt.y()
-        rw, rh = rect_qt.width(), rect_qt.height()
-
-        patch_totali_wsi = self.project_manager.data.get("patches", [])
-
-        patch_eleggibili = []
-        for p in patch_totali_wsi:
-            if p.get("roi_id") is None:
-                pw = p.get("w", p.get("width", 0))
-                ph = p.get("h", p.get("height", 0))
-                px = p["x"]
-                py = p["y"]
-
-                inter_left = max(rx, px)
-                inter_top = max(ry, py)
-                inter_right = min(rx + rw, px + pw)
-                inter_bottom = min(ry + rh, py + ph)
-
-                if inter_left < inter_right and inter_top < inter_bottom:
-                    area_intersezione = (inter_right - inter_left) * (inter_bottom - inter_top)
-                    area_patch = pw * ph
-
-                    if area_patch > 0 and (area_intersezione / area_patch) >= 0.40:
-                        patch_eleggibili.append(p)
-
-        totale_valide = len(patch_eleggibili)
-
-        if totale_valide == 0:
-            QMessageBox.warning(self.view, "ROI Vuota",
-                                "L'area selezionata non contiene patch di tessuto valide (oppure sono già state assegnate ad altre ROI).")
-            self.view.minimap_view.undo_last_roi()
-            return
-
-        roi_list_corrente = self.project_manager.data["sampling_config"]["roi_list"]
-        if roi_list_corrente:
-            numeri_roi = []
-            for r in roi_list_corrente:
-                try:
-                    numeri_roi.append(int(r["id"].split("_")[1]))
-                except (IndexError, ValueError):
-                    numeri_roi.append(0)
-
-            max_id = max(numeri_roi)
-        else:
-            max_id = 0
-
-        nuovo_id = f"ROI_{max_id + 1}"
-
-        dialog = NewRoiDialog(nuovo_id, totale_valide, parent=self.view)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            percentuale, ordine = dialog.get_dati()
-
-            indici_campionati = self.project_manager.genera_indici_campionamento(
-                totale_patch=totale_valide,
-                percentuale=percentuale,
-                modalita=ordine
-            )
-
-            da_campionare = len(indici_campionati)
-
-            nuova_roi = {
-                "id": nuovo_id,
-                "x": int(rx), "y": int(ry), "width": int(rw), "height": int(rh),
-                "sampling_percentage": percentuale,
-                "sampling_order": ordine,
-                "stats": {"total_valid": totale_valide, "sampled": da_campionare, "labeled": 0}
-            }
-
-            roi_list_corrente.append(nuova_roi)
-
-            import random
-            patch_scelte = random.sample(patch_eleggibili, da_campionare)
-
-            for p in patch_eleggibili:
-                p["roi_id"] = nuovo_id
-                p["is_sampled"] = False
-
-            for p in patch_scelte:
-                p["is_sampled"] = True
-
-            self.project_manager.salva_su_disco()
-
-            self.view.minimap_view.undo_last_roi()
-
-            self.aggiorna_vista()
-
-        else:
-            self.view.minimap_view.undo_last_roi()
+    # ==========================================
+    # LOGICA DI DISEGNO ROI E CAMPIONAMENTO
+    # ==========================================
 
     def _gestisci_nuova_roi(self, rects_disegnati):
+        """
+        Intercetto il rettangolo disegnato (ROI), forzo i suoi bordi ad allinearsi (snap) alle patch reali della
+        griglia e salvo la nuova ROI.
+        """
         if not rects_disegnati:
             return
 
         rect_utente = rects_disegnati[-1]
 
+        # Applico il Grid Snapping per allinearmi alle patch reali
         rect_snappato, patch_coinvolte = self._applica_grid_snapping(rect_utente)
 
         if not rect_snappato:
@@ -208,8 +131,8 @@ class NewProjectDashboardController:
             self.view.minimap_view.undo_last_roi()
             return
 
+        # Assegno un nuovo ID senza sovrascrivere quelli vecchi
         lista_roi = self.project_manager.data.get("sampling_config", {}).get("roi_list", [])
-
         if lista_roi:
             numeri_roi = []
             for r in lista_roi:
@@ -222,15 +145,13 @@ class NewProjectDashboardController:
             max_id = 0
 
         roi_id = f"ROI_{max_id + 1}"
-
         patch_totali_valide = len(patch_coinvolte)
 
+        # Finestra di settaggio e conferma ROI
         dialog = NewRoiDialog(roi_id, patch_totali_valide, self.view)
         if dialog.exec():
             perc_camp, ordine = dialog.get_dati()
-
             da_campionare = int(patch_totali_valide * (perc_camp / 100.0))
-            import random
             patch_scelte = random.sample(patch_coinvolte, da_campionare)
 
             for p in patch_coinvolte:
@@ -263,6 +184,7 @@ class NewProjectDashboardController:
             self.project_manager.data["sampling_config"]["roi_list"].append(nuova_roi)
             self.project_manager.salva_su_disco()
 
+            # Rimuovo il disegno della ROI per lasciare la snap grid
             self.view.minimap_view.undo_last_roi()
             self.aggiorna_vista()
         else:
@@ -308,7 +230,7 @@ class NewProjectDashboardController:
         roi_list = data.get("sampling_config", {}).get("roi_list", [])
         data["sampling_config"]["roi_list"] = [r for r in roi_list if r.get("id") != roi_id]
 
-
+        # Elimino l'appartenenza delle patch alla ROI
         for p in patch_collegate:
             p["roi_id"] = None
             p["is_sampled"] = False
@@ -316,7 +238,6 @@ class NewProjectDashboardController:
             p["status"] = None
 
         self.project_manager.salva_su_disco()
-
         self.aggiorna_vista()
 
         QMessageBox.information(
@@ -326,6 +247,7 @@ class NewProjectDashboardController:
         )
 
     def _salva_stato_roi(self, roi_id: str, is_active: bool):
+        """Salva nel JSON lo stato della ROI"""
         roi_list = self.project_manager.data["sampling_config"]["roi_list"]
 
         for roi in roi_list:
@@ -339,6 +261,7 @@ class NewProjectDashboardController:
         patch_da_etichettare = []
         roi_coinvolte = set()
 
+        # Intercetto le patch toccate dal rettangolo
         for patch in self.project_manager.data.get("patches", []):
             if not patch.get("roi_id"):
                 continue
@@ -355,8 +278,8 @@ class NewProjectDashboardController:
             QMessageBox.warning(self.view, "Selezione Vuota", "L'area selezionata non contiene patch di tessuto valide.\nProva a selezionare un'area più ampia o con maggior densità cellulare.")
             return
 
+        # Conferma utente
         numero_patch = len(patch_da_etichettare)
-
         box_conferma = QMessageBox(self.view)
         box_conferma.setWindowTitle("Campionamento Mirato")
         box_conferma.setText(f"<b>{numero_patch}</b> patch selezionate.")
@@ -365,27 +288,28 @@ class NewProjectDashboardController:
 
         btn_annulla = box_conferma.addButton("Annulla", QMessageBox.ButtonRole.RejectRole)
         btn_etichetta = box_conferma.addButton("Etichetta", QMessageBox.ButtonRole.AcceptRole)
-
         box_conferma.setDefaultButton(btn_etichetta)
-
         box_conferma.exec()
 
         if box_conferma.clickedButton() == btn_annulla:
             return
 
-        nuove_campionate = 0
-        for p in patch_da_etichettare:
-            if not p.get("is_sampled", False):
-                p["is_sampled"] = True
-                nuove_campionate += 1
+        patch_effettivamente_modificate = [p for p in patch_da_etichettare if not p.get("is_sampled", False)]
 
-        if nuove_campionate > 0:
+        if patch_effettivamente_modificate:
+            for p in patch_effettivamente_modificate:
+                p["is_sampled"] = True
+
+            # Aggiorno i contatori dividendo il numero correttamente per ogni singola ROI
             for roi in self.project_manager.data.get("sampling_config", {}).get("roi_list", []):
                 if roi["id"] in roi_coinvolte:
-                    roi["stats"]["sampled"] += nuove_campionate
-            self.project_manager.salva_su_disco()
-            self.aggiorna_vista()  # Aggiorna la tabella "Fatte / Tot."
+                    incremento = sum(1 for p in patch_effettivamente_modificate if p.get("roi_id") == roi["id"])
+                    roi["stats"]["sampled"] += incremento
 
+            self.project_manager.salva_su_disco()
+            self.aggiorna_vista()
+
+        # Inizio sessione mirata
         id_patch_selezionate = [p["patch_id"] for p in patch_da_etichettare]
 
         if hasattr(self, 'naviga_a_etichettatura') and self.naviga_a_etichettatura:
@@ -393,8 +317,7 @@ class NewProjectDashboardController:
 
     def _applica_grid_snapping(self, rect_utente: QRectF):
         """
-        Motore di Grid Snapping: accetta solo le patch sovrapposte per almeno il 40%
-        e calcola il Bounding Box perfetto che le contiene tutte.
+        Motore di Grid Snapping: analizza l'area disegnata e restituisce solo le patch sovrapposte per almeno il 40%.
         """
         patch_accettate = []
         min_x, min_y = float('inf'), float('inf')
@@ -403,7 +326,7 @@ class NewProjectDashboardController:
         patches = self.project_manager.data.get("patches", [])
 
         for patch in patches:
-
+            # Ignoro patch che appartengono già ad altre ROI
             if patch.get("roi_id"): continue
 
             w = patch.get("width", patch.get("w", 0))
@@ -416,9 +339,11 @@ class NewProjectDashboardController:
                 area_intersezione = intersezione.width() * intersezione.height()
                 area_patch = w * h
 
+                # 40% di copertura richiesta per essere ritenuta valida
                 if area_patch > 0 and (area_intersezione / area_patch) >= 0.40:
                     patch_accettate.append(patch)
 
+                    # Estendo i confini della ROI
                     if patch["x"] < min_x: min_x = patch["x"]
                     if patch["y"] < min_y: min_y = patch["y"]
                     if patch["x"] + w > max_x: max_x = patch["x"] + w

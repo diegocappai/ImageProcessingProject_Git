@@ -1,7 +1,7 @@
 from typing import Optional
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QMessageBox,
                                QLabel, QPushButton, QTextEdit, QRadioButton, QButtonGroup,
-                               QCheckBox, QFrame, QScrollArea, QGridLayout, QComboBox)
+                               QFrame, QScrollArea, QGridLayout, QComboBox)
 from PySide6.QtGui import QPixmap, QShortcut, QKeySequence
 from PySide6.QtCore import Qt, Signal
 from Interface_Package.visualizzatori.visualizzatore_patch import VisualizzatorePatch
@@ -15,7 +15,7 @@ class EtichettaturaWindow(QWidget):
     # ==========================================
     # SEGNALI
     # ==========================================
-    etichetta_selezionata = Signal(str, bool)     # booleano (True se proviene da scorciatoia, False se è un click)
+    etichetta_selezionata = Signal(str, bool)  # booleano (True se proviene da scorciatoia, False se è un click)
     richiesta_rimozione_etichetta = Signal()
     richiesta_avanti = Signal()
     richiesta_indietro = Signal()
@@ -41,26 +41,27 @@ class EtichettaturaWindow(QWidget):
         # ==========================================
         body_layout = QHBoxLayout()
 
-        # 🟢 1. COLONNA SINISTRA: CRONOLOGIA (Visual Context History)
+        # COLONNA SINISTRA: CRONOLOGIA
         history_panel = QVBoxLayout()
         history_panel.setSpacing(10)
 
         titolo_history = QLabel("Ultime Patch Etichettate:")
-        titolo_history.setStyleSheet("font-weight: bold; font-size: 14px; color: red;")
+        titolo_history.setProperty("class", "SectionTitle")
         titolo_history.setAlignment(Qt.AlignmentFlag.AlignCenter)
         history_panel.addWidget(titolo_history)
 
         self.scroll_history = QScrollArea()
         self.scroll_history.setFixedWidth(350)
         self.scroll_history.setWidgetResizable(True)
+        self.scroll_history.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_history.setStyleSheet("background: transparent;")
         self.scroll_history.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll_history.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self.history_container = QWidget()
-        self.history_container.setStyleSheet("background-color: transparent;")
         self.history_layout = QGridLayout(self.history_container)
         self.history_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
-        self.history_layout.setSpacing(5)  # Spazio arioso tra le miniature
+        self.history_layout.setSpacing(5)
         self.history_layout.setContentsMargins(5, 5, 5, 5)
 
         self.scroll_history.setWidget(self.history_container)
@@ -68,17 +69,15 @@ class EtichettaturaWindow(QWidget):
 
         body_layout.addLayout(history_panel)
 
-        # 🔵 2. COLONNA CENTRALE: IMMAGINE E NAVIGAZIONE
+        # COLONNA CENTRALE: IMMAGINE E NAVIGAZIONE
         center_panel = QVBoxLayout()
         center_panel.setSpacing(10)
 
         self.image_viewer = VisualizzatorePatch()
-        self.image_viewer.reset_interfaccia()
         center_panel.addWidget(self.image_viewer, stretch=1)
 
         self.radio_rivedere = QRadioButton("Segna come «da rivedere» [R]")
         self.radio_rivedere.setAutoExclusive(False)
-        self.radio_rivedere.setProperty("class", "ReviewRadio")
         center_panel.addWidget(self.radio_rivedere)
 
         # Controller di Navigazione
@@ -103,13 +102,13 @@ class EtichettaturaWindow(QWidget):
 
         body_layout.addLayout(center_panel, stretch=3)
 
-        # --- PANNELLO DESTRO (Bottoni Dinamici e Note) ---
+        # --- COLONNA DESTRA: STRUMENTI E CLASSI ---
         right_panel = QVBoxLayout()
         right_panel.setSpacing(15)
 
         # MENU A TENDINA PER I FILTRI
         titolo_filtri = QLabel("Filtro Navigazione:")
-        titolo_filtri.setStyleSheet("font-weight: bold; font-size: 14px;")
+        titolo_filtri.setProperty("class", "SectionTitle")
         right_panel.addWidget(titolo_filtri)
 
         self.combo_filtri = QComboBox()
@@ -119,14 +118,12 @@ class EtichettaturaWindow(QWidget):
             "Solo senza etichetta [F3]",
             "Solo 'da rivedere' [F4]"
         ])
-        # Stile per renderlo alto e cliccabile comodamente
-        self.combo_filtri.setStyleSheet("QComboBox { padding: 5px; font-size: 13px; }")
         right_panel.addWidget(self.combo_filtri)
 
-        right_panel.addSpacing(10)  # Un po' di respiro prima delle classi
+        right_panel.addSpacing(10)
 
         titolo_etichette = QLabel("Classi di Etichette")
-        titolo_etichette.setStyleSheet("font-weight: bold; font-size: 14px;")
+        titolo_etichette.setProperty("class", "SectionTitle")
         right_panel.addWidget(titolo_etichette)
 
         # CONTENITORE DINAMICO PER I BOTTONI
@@ -145,7 +142,7 @@ class EtichettaturaWindow(QWidget):
         self.text_note.setProperty("class", "NoteInput")
         right_panel.addWidget(self.text_note, stretch=1)
 
-        # Salva ed Esci
+        # Bottone di uscita
         save_layout = QHBoxLayout()
         save_layout.addStretch()
 
@@ -170,16 +167,13 @@ class EtichettaturaWindow(QWidget):
     # API PUBBLICA
     # ==========================================
 
-    # Generazione dinamica dell'interfaccia
     def imposta_etichette_da_json(self, lista_etichette: list[str], color_map: dict = None):
         """
-        Riceve l'elenco delle classi dal file di progetto e crea fisicamente
+        Riceve i colori e l'elenco delle classi dal file di progetto e crea dinamicamente
         i pulsanti e le scorciatoie da tastiera
         """
-        # Pulizia preventiva
         self._pulisci_bottoni_esistenti()
 
-        # 🟢 Salviamo la mappa colori nella view per usarla nella cronologia!
         self.color_map = color_map or {}
 
         # Creazione dinamica
@@ -193,19 +187,18 @@ class EtichettaturaWindow(QWidget):
             nuovo_btn.setProperty("class", "LabelButton")
             nuovo_btn.setProperty("raw_label", nome_etichetta)
 
-            # Opzionale: Se vuoi colorare anche il bordino del bottone con il colore della classe
+            # Bordino del bottone con il colore della classe
             if nome_etichetta in self.color_map:
                 colore = self.color_map[nome_etichetta]
-                nuovo_btn.setStyleSheet(f"border-left: 5px solid {colore};")
+                nuovo_btn.setStyleSheet(f"QPushButton {{ border-left: 5px solid {colore}; }}")
 
             nuovo_btn.clicked.connect(lambda checked=False, nome=nome_etichetta: self.etichetta_selezionata.emit(nome, False))
 
-            # Aggiungiamo alla UI e al tracciamento
             self.layout_bottoni_etichette.addWidget(nuovo_btn)
             self.gruppo_etichette.addButton(nuovo_btn)
             self.bottoni_dinamici[nome_etichetta] = nuovo_btn
 
-            # Creiamo lo shortcut hardware
+            # Creiamo lo shortcut
             if tasto:
                 shortcut = QShortcut(QKeySequence(tasto), self)
                 shortcut.activated.connect(lambda n=nome_etichetta: self._shortcut_etichetta(n))
@@ -213,12 +206,12 @@ class EtichettaturaWindow(QWidget):
 
     def mostra_etichetta_selezionata(self, etichetta_salvata: Optional[str]):
         """Accende il bottone corretto senza innescare i segnali"""
-        # Blocchiamo i segnali del gruppo così l'interfaccia si aggiorna in silenzio
         self.gruppo_etichette.blockSignals(True)
-
         self.gruppo_etichette.setExclusive(False)
+
         for btn in self.bottoni_dinamici.values():
             btn.setChecked(False)
+
         self.gruppo_etichette.setExclusive(True)
 
         if etichetta_salvata and etichetta_salvata in self.bottoni_dinamici:
@@ -227,21 +220,20 @@ class EtichettaturaWindow(QWidget):
         self.gruppo_etichette.blockSignals(False)
 
     def get_etichetta_attiva(self) -> Optional[str]:
-        """Restituisce il nome pulito dell'etichetta selezionata, se c'è"""
+        """Restituisce il nome pulito dell'etichetta selezionata se esiste"""
         btn = self.gruppo_etichette.checkedButton()
         return btn.property("raw_label") if btn else None
 
     def carica_immagine(self, dato_immagine):
-        # Se è già un QPixmap (dal controller), usalo DIRETTAMENTE senza clonarlo!
+        """Passa la Pixmap al componente visivo centrale"""
         if isinstance(dato_immagine, QPixmap):
             pixmap = dato_immagine
         else:
-            # Altrimenti comportati come prima (se è un percorso file)
             pixmap = QPixmap(dato_immagine) if dato_immagine else QPixmap()
 
         if pixmap.isNull():
-            self.image_viewer.pulisci_visualizzazione()
             return
+
         self.image_viewer.mostra_immagine(pixmap)
 
     def aggiorna_stato_navigazione(self, indice_corrente: int, totale_patch: int):
@@ -250,14 +242,14 @@ class EtichettaturaWindow(QWidget):
         self.label_counter.setText(f"{indice_corrente + 1} di {totale_patch}")
 
     def aggiorna_cronologia(self, history_data: list):
-        """Riceve una lista di tuple (QPixmap, nome_etichetta, colore) e le disegna"""
-        # 1. Pulisce la vecchia lista
+        """Svuota la cronologia a sinistra e la ridisegna con le ultime tuple"""
+        # Pulisce la vecchia lista
         while self.history_layout.count():
             item = self.history_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # 2. Disegna le nuove miniature
+        # Disegna le nuove miniature
         for index, (pid, pixmap, nome, colore) in enumerate(history_data):
             thumb = ThumbnailHistoryWidget(pid, pixmap, nome, colore)
             thumb.doppio_click.connect(self.richiesta_salto.emit)
@@ -327,9 +319,8 @@ class EtichettaturaWindow(QWidget):
         msg.setText("Hai raggiunto l'ultima patch di questa sessione!")
         msg.setInformativeText("Vuoi tornare alla Dashboard o revisionare la sessione corrente?")
 
-        # Creiamo due bottoni personalizzati
         btn_dashboard = msg.addButton("Torna alla Dashboard", QMessageBox.ButtonRole.AcceptRole)
-        btn_resta = msg.addButton("Revisiona", QMessageBox.ButtonRole.RejectRole)
+        msg.addButton("Revisiona", QMessageBox.ButtonRole.RejectRole)
 
         # Mostriamo il popup e blocchiamo l'interfaccia finché l'utente non sceglie
         msg.exec()
@@ -346,14 +337,15 @@ class EtichettaturaWindow(QWidget):
     # EVENTI TASTIERA (Zoom contensto)
     # ==========================================
     def keyPressEvent(self, event):
-        # Sicurezza: Se l'utente sta digitando nelle note, disattiviamo le scorciatoie!
+        # Se l'utente sta digitando nelle note, disattiviamo le scorciatoie
         if self.text_note.hasFocus():
             super().keyPressEvent(event)
             return
 
-        # isAutoRepeat() è fondamentale: impedisce che tenere premuto spari mille segnali al secondo
+        # impedisce che tenere premuto invii ripetutamente segnali
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
-            self.richiesta_contesto.emit(True) # Invia TRUE
+            self.richiesta_contesto.emit(True) #
+
         # Tasto CANC o BACKSPACE per eliminare l'etichetta
         elif event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and not event.isAutoRepeat():
             self.richiesta_rimozione_etichetta.emit()
@@ -362,7 +354,7 @@ class EtichettaturaWindow(QWidget):
 
     def keyReleaseEvent(self, event):
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
-            self.richiesta_contesto.emit(False) # Invia FALSE
+            self.richiesta_contesto.emit(False)
         super().keyReleaseEvent(event)
 
 
@@ -375,8 +367,9 @@ class ThumbnailHistoryWidget(QFrame):
         self.patch_id = patch_id
 
         dimensione_lato = 140
-        self.setFixedSize(dimensione_lato, dimensione_lato + 30)  # +30 per il banner di testo
+        self.setFixedSize(dimensione_lato, dimensione_lato + 30)
 
+        # Il colore del bordo del frame prende il colore della classe
         self.setStyleSheet(f"""
             QFrame {{
                 border: 1px solid {colore_hex};
@@ -390,8 +383,6 @@ class ThumbnailHistoryWidget(QFrame):
         layout.setSpacing(0)
 
         lbl_img = QLabel()
-
-
         scaled_pixmap = pixmap.scaled(
             dimensione_lato, dimensione_lato,
             Qt.AspectRatioMode.KeepAspectRatio,

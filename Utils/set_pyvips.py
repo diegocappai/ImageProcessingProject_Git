@@ -18,7 +18,6 @@ def setup_vips():
     vips_home = os.getenv("VIPS_HOME", r'C:\vips\vips-dev-8.17\bin')
 
     if os.path.exists(vips_home):
-        # Aggiunge al PATH
         os.environ['PATH'] = vips_home + ';' + os.environ['PATH']
 
         if hasattr(os, 'add_dll_directory'):
@@ -30,5 +29,4 @@ def setup_vips():
         print(f"ATTENZIONE: Percorso Vips non trovato: {vips_home}")
 
 
-# Esegue la configurazione appena questo file viene importato
 setup_vips()

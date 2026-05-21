@@ -1,7 +1,9 @@
-from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication
-from PySide6.QtWidgets import QMessageBox, QDialog, QProgressDialog
-from PySide6.QtCore import Qt
+import os
+import shutil
+import random
+
+from PySide6.QtCore import QObject, Qt
+from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QProgressDialog
 
 # --- Importa la MainWindow ---
 from Interface_Package.main_view import MainWindow
@@ -17,18 +19,18 @@ from Controllers.home_controller import HomeController
 # --- Importa New Project ---
 from Interface_Package.views.new_project_view import NewProjectDialog
 
-# --- Importa Dashboards ---
-from Interface_Package.views.new_dashboard_view import NewProjectDashboardView
-from Controllers.new_dashboard_controller import NewProjectDashboardController
-from Interface_Package.views.dashboard_view import ProjectDashboardView
-from Controllers.dashboard_controller import ProjectDashboardController
-
 # --- Importa i Setup ---
 from Interface_Package.views.setting_new_slide_view import ImpostazioniSlideDialog
 from Interface_Package.views.setting_new_folder_view import ImpostazioniDialog
 from Models.setup_model import SetupSlideModel, SetupFolderModel
 from Controllers.setup_slide_controller import SetupSlideController
 from Controllers.setup_folder_controller import SetupFolderController
+
+# --- Importa Dashboards ---
+from Interface_Package.views.new_dashboard_view import NewProjectDashboardView # Input SLide
+from Controllers.new_dashboard_controller import NewProjectDashboardController
+from Interface_Package.views.dashboard_view import ProjectDashboardView # Input Folder
+from Controllers.dashboard_controller import ProjectDashboardController
 
 # --- Importa Etichettatura ---
 from Interface_Package.views.labeling_view import EtichettaturaWindow
@@ -39,14 +41,17 @@ from Utils.utils import crea_cartella_univoca
 
 
 class AppController(QObject):
+    """
+    Controller principale dell'applicazione
+    """
 
     def __init__(self):
         super().__init__()
 
-        # Creazione dello scheletro visivo principale
+        # Creazione della finestra visiva principale
         self.main_window = MainWindow()
 
-        # nizializzazione della triade MVC iniziale
+        # Inizializzazione di Home (Model e View)
         self.home_model = HomeModel()
         self.home_view = HomeView()
 
@@ -62,14 +67,15 @@ class AppController(QObject):
         self.main_window.stack.addWidget(self.home_view)
 
     def avvia(self):
+        """Mostra la fienstra all'avvio del programma"""
         self.main_window.showMaximized()
 
     # ==========================================
-    # FLUSSI DI NAVIGAZIONE E ROUTING GLOBALE
+    # FLUSSI DI NAVIGAZIONE E ROUTING
     # ==========================================
 
     def flusso_carica_progetto(self, percorso_cartella):
-        """Gestisce l'azione di caricamento di un progetto esistente su disco"""
+        """Gestisce l'azione di caricamento di un progetto già esistente su disco, se non è corrotto"""
         print(f"[AppController] Avvio caricamento del progetto da {percorso_cartella}")
 
         self.project_manager = ProjectManager()
@@ -85,20 +91,20 @@ class AppController(QObject):
             )
 
     def flusso_nuovo_progetto(self):
-        """Inizializza il Wizard per raccogliere i dati di un nuovo progetto."""
+        """Inizializza il Wizard per raccogliere i dati di un nuovo progetto"""
         dialog = NewProjectDialog(parent=self.main_window)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             dati_progetto = dialog.get_project_data()
 
-            # Strategy Pattern: Smistamento in base al tipo di sorgente
+            # Smistamento in base al tipo di sorgente
             if dati_progetto["input_type"] == "Slide":
                 self.avvia_setup_slide(dati_progetto)
             elif dati_progetto["input_type"] == "Dataset":
                 self.avvia_setup_cartella(dati_progetto)
 
     def avvia_setup_slide(self, dati_progetto):
-        """Flusso specifico per i file WSI (Whole Slide Image)"""
+        """Flusso di configurazione per le WSI (Whole Slide Image)"""
         model = SetupSlideModel()
         model.imposta_slide(dati_progetto["input_path"])
 
@@ -106,9 +112,11 @@ class AppController(QObject):
         setup_controller = SetupSlideController(model, view)
 
         if setup_controller.esegui():
+            # Recupero le classi selezionate dall'utente
             classi_scelte = view.get_classi_etichette()
             if not classi_scelte:
                 classi_scelte = ["Tessuto Normale", "Necrosi", "Infiammazione"]
+
             parametri = {
                 "source_path": dati_progetto["input_path"],
                 "img_w": model.larghezza_originale,
@@ -117,7 +125,7 @@ class AppController(QObject):
                 "roi_reali": model.roi_list
             }
 
-            # Delega la creazione fisica del JSON
+            # Delega la creazione fisica sei file e del JSON
             self.flusso_avvia_etichettatura(
                 cartella_destinazione=dati_progetto["output_path"],
                 nome=dati_progetto["name"],
@@ -130,7 +138,7 @@ class AppController(QObject):
             self.flusso_nuovo_progetto()
 
     def avvia_setup_cartella(self, dati_progetto):
-        """Flusso specifico per le cartelle pre-processate di immagini (Dataset)"""
+        """Flusso di configurazione per le cartelle di patch pre-processate (Dataset)"""
         model = SetupFolderModel()
         model.imposta_cartella(dati_progetto["input_path"])
 
@@ -144,14 +152,14 @@ class AppController(QObject):
         setup_controller = SetupFolderController(model, view)
 
         if setup_controller.esegui():
-            # Recuperiamo la percentuale pulita per i parametri
+            # Recuperiamo la percentuale per i parametri
             testo_perc = view.combo_perc.currentText().replace("%", "")
             perc_scelta = int(testo_perc)
 
             parametri = {
                 "source_path": dati_progetto["input_path"],
                 "sampling_percentage": perc_scelta,
-                "ordine": "Sequenziale" if view.radio_seq.isChecked() else "Random"
+                "show_order": "sequential" if view.radio_seq.isChecked() else "random"
             }
 
             classi_scelte = view.get_classi_etichette()
@@ -168,17 +176,19 @@ class AppController(QObject):
             )
         else:
             self.flusso_nuovo_progetto()
+
     # ==========================================
     # CREAZIONE FISICA DEL PROGETTO (JSON)
     # ==========================================
 
     def flusso_avvia_etichettatura(self, cartella_destinazione, nome, tipo, parametri, setup_model, classi_etichette):
-        """Assembla i dati calcolati e genera fisicamente la struttura di cartelle e il JSON"""
-        import os
-        import shutil
+        """
+        Assembla i dati calcolati e genera fisicamente la struttura di cartelle e il JSON
+        """
 
         percorso_progetto, nome_definitivo = crea_cartella_univoca(cartella_destinazione, nome)
 
+        # Inizializzo il popup della barra di caricamento del progetto
         self.progress_dialog = QProgressDialog("Calcolo dati in corso...", None, 0, 100, self.main_window)
         self.progress_dialog.setWindowTitle("Creazione in corso")
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
@@ -187,14 +197,13 @@ class AppController(QObject):
         QApplication.instance().processEvents()
 
         def aggiorna_ui(percentuale, testo):
+            """Serve a far avanzare la barra e aggiornare la UI"""
             self.progress_dialog.setValue(percentuale)
             self.progress_dialog.setLabelText(testo)
             QApplication.instance().processEvents()
 
         try:
-            # ========================================================
-            # INPUT DA SLIDE
-            # ========================================================
+            # --- SETUP PER SLIDE ---
             if tipo == "whole_image":
                 aggiorna_ui(15, "Inizializzazione copia file Slide nel progetto...")
                 src_slide = parametri.get("source_path")
@@ -212,13 +221,12 @@ class AppController(QObject):
                     parametri["source_path"] = dest_slide
                     print(f"[DEBUG - SENIOR] Slide copiata internamente: {dest_slide}")
 
-            # Estrazione dei dati dal modello di setup
+            # Estrazione dei dati delle patch/ROI
             dati_estratti = setup_model.prepara_dati(callback_ui=aggiorna_ui)
-
             if isinstance(dati_estratti, list):
                 dati_estratti = {"patches": dati_estratti}
 
-            # Generazione iniziale del JSON da parte del ProjectManager
+            # Generazione del JSON tramite il Manager
             self.project_manager = ProjectManager()
             self.project_manager.crea_nuovo_progetto(
                 cartella_destinazione=percorso_progetto,
@@ -230,18 +238,17 @@ class AppController(QObject):
                 callback_ui=aggiorna_ui
             )
 
-            # ========================================================
-            # INPUT DA CARTELLA
-            # ========================================================
+            # --- SETUP CARTELLA DI PATCH ---
             if tipo == "patch_folder":
                 perc_val = parametri.get("sampling_percentage", 100)
-                ordine = parametri.get("ordine", "Sequenziale")
+                order = parametri.get("show_order", "sequential")
 
                 self.project_manager.data["sampling_config"] = {
                     "sampling_percentage": perc_val,
-                    "ordine": ordine
+                    "show_order": order
                 }
 
+                # Calcolo numero di patch
                 patch_list = self.project_manager.data.get("patches", [])
                 totale = len(patch_list)
                 da_campionare = max(1, int(totale * (perc_val / 100.0))) if totale > 0 else 0
@@ -261,8 +268,7 @@ class AppController(QObject):
                             "is_sampled": False
                         })
 
-                if ordine == "Random":
-                    import random
+                if order == "random":
                     campionate = random.sample(patch_strutturate, min(da_campionare, len(patch_strutturate)))
                 else:
                     campionate = patch_strutturate[:da_campionare]
@@ -270,13 +276,14 @@ class AppController(QObject):
                 for p in campionate:
                     p["is_sampled"] = True
 
+                # Preparo la cartella per copiare le patch
                 cartella_patches_locale = os.path.join(percorso_progetto, "patches")
                 os.makedirs(cartella_patches_locale, exist_ok=True)
 
                 src_dir = parametri.get("source_path")
-                tot_da_copiare = len(
-                    patch_strutturate)
+                tot_da_copiare = len(patch_strutturate)
 
+                # Ciclo di copia
                 for idx, p in enumerate(patch_strutturate):
                     nome_file = p["file_name"]
                     src_file = os.path.join(src_dir, nome_file)
@@ -285,10 +292,12 @@ class AppController(QObject):
                     if os.path.exists(src_file):
                         shutil.copy2(src_file, dest_file)
 
+                    # Aggiorno la UI
                     if idx % max(1, tot_da_copiare // 5) == 0:
                         perc_progresso = 50 + int((idx / tot_da_copiare) * 45)
                         aggiorna_ui(perc_progresso, f"Salvataggio totale immagini... ({idx}/{tot_da_copiare})")
 
+                # Salvo i percorsi definitivi e salvo sul JSON
                 self.project_manager.data["source_path"] = cartella_patches_locale
                 self.project_manager.data["patches"] = patch_strutturate
 
@@ -306,7 +315,8 @@ class AppController(QObject):
 
         except Exception as e:
             self.progress_dialog.close()
-            QMessageBox.critical(self.main_window, "Errore Critico",
+            QMessageBox.critical(self.main_window,
+                                 "Errore Critico",
                                  f"Si è verificato un errore nel salvataggio: {str(e)}")
 
     # ==========================================
@@ -321,13 +331,13 @@ class AppController(QObject):
 
     def flusso_torna_alla_dashboard(self):
         """
-        Ritorna alla Dashboard
+        Chiude la schermata di etichettatura e ritorna alla Dashboard
         """
         print("[AppController] Ritorno alla Dashboard e pulizia memoria.")
         self.dashboard_controller.aggiorna_vista()
         self.main_window.stack.setCurrentWidget(self.dashboard_view)
 
-        # Svuotiamo la memoria distruggendo la View di Etichettatura
+        # Svuotiamo la memoria distruggendo la View di Etichettatura (libera RAM)
         if hasattr(self, 'etichettatura_view') and self.etichettatura_view:
             self.main_window.stack.removeWidget(self.etichettatura_view)
             self.etichettatura_view.deleteLater()
@@ -336,23 +346,15 @@ class AppController(QObject):
             self.etichettatura_controller = None
 
     def apri_dashboard_progetto(self):
-        """Routing intelligente per istanziare la dashboard corretta in base al tipo di input"""
-
-        # Scopriamo che tipo di progetto stiamo aprendo
+        """Istanzia la dashboard corretta in base al tipo di input"""
         tipo_sorgente = self.project_manager.data.get("source_type", "")
 
         if tipo_sorgente in ["whole_image", "Slide"]:
-
-
             self.dashboard_view = NewProjectDashboardView()
             self.dashboard_controller = NewProjectDashboardController(self.project_manager, self.dashboard_view)
-
         else:
-
-
             self.dashboard_view = ProjectDashboardView()
             self.dashboard_controller = ProjectDashboardController(self.project_manager, self.dashboard_view)
-
 
         self.dashboard_controller.naviga_a_etichettatura = self.apri_schermata_etichettatura
         self.dashboard_controller.naviga_a_home = self.flusso_torna_alla_home
@@ -361,6 +363,9 @@ class AppController(QObject):
         self.main_window.stack.setCurrentWidget(self.dashboard_view)
 
     def apri_schermata_etichettatura(self, roi_selezionate=None, patch_selezionate=None):
+        """
+        Istanzio il modulo di etichettatura (View + Controller)
+        """
         self.etichettatura_view = EtichettaturaWindow()
 
         self.etichettatura_controller = EtichettaturaController(

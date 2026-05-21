@@ -1,56 +1,66 @@
-from PySide6.QtWidgets import QScrollArea, QWidget
+from PySide6.QtWidgets import QScrollArea, QWidget, QLabel
 from PySide6.QtCore import Qt, QPoint
 
 
 
 class VisualizzatoreBase(QScrollArea):
     """
-    Classe base astratta che gestisce Zoom, Panning (trascinamento)
-    e calcoli delle coordinate.
+    Classe base astratta che gestisce Zoom, Panning e calcoli delle coordinate.
     """
 
 
     def __init__(self, internal_widget: QWidget):
-        # Ereditiamo QScrollArea per gestire automaticamente le barre di scorrimento
+
         super().__init__()
 
-        # Setup base della ScrollArea
+        # Configuro il comportamento base dell'area di scorrimento
         self.setAlignment(Qt.AlignCenter)
         self.setWidgetResizable(False)
         self.setCursor(Qt.OpenHandCursor)
 
-        # Variabili di stato
+        # Variabili di stato per tracciare il mouse e lo zoom
         self.last_mouse_pos = QPoint()
         self.is_dragging = False
         self.scale_factor = 1.0
         self.original_pixmap = None
 
-        # Il widget interno viene iniettato dalla sottoclasse
+        # Salvo il widget interno passato dalle sottoclassi
         self.image_widget = internal_widget
-        self.image_widget.setAlignment(Qt.AlignCenter)
         self.setWidget(self.image_widget)
 
-    # --- LOGICA ZOOM ---
+        # Allineo il testo/immagine al centro
+        if isinstance(self.image_widget, QLabel):
+            self.image_widget.setAlignment(Qt.AlignCenter)
+
+    # ==========================================
+    # LOGICA DI ZOOM
+    # ==========================================
     def wheelEvent(self, event):
+        """
+        Intercetto la rotellina del mousee, calcolo il nuovo fattore di scala e aggiorno la geometria dell'immagine,
+        """
         if not self.original_pixmap:
             return
 
         # Verso rotazione rotella
         if event.angleDelta().y() > 0:
-            self.scale_factor *= 1.2
+            fattore_moltiplicativo = 1.2
         else:
-            self.scale_factor *= 0.8
+            fattore_moltiplicativo = 0.8
 
         # Limiti zoom
-        self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
+        nuovo_zoom = self.scale_factor * fattore_moltiplicativo
+        self.scale_factor = max(0.1, min(nuovo_zoom, 10.0))
 
         self.aggiorna_visualizzazione()
 
         # Aggiusta scrollbar per centrare lo zoom
-        self.adjust_scrollbar(self.horizontalScrollBar(), 1.2 if event.angleDelta().y() > 0 else 0.8)
-        self.adjust_scrollbar(self.verticalScrollBar(), 1.2 if event.angleDelta().y() > 0 else 0.8)
+        self.adjust_scrollbar(self.horizontalScrollBar(), fattore_moltiplicativo)
+        self.adjust_scrollbar(self.verticalScrollBar(), fattore_moltiplicativo)
 
-    # --- LOGICA PANNING ---
+    # ==========================================
+    # LOGICA DI PANNING
+    # ==========================================
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.is_dragging = True
@@ -79,20 +89,22 @@ class VisualizzatoreBase(QScrollArea):
             self.setCursor(Qt.OpenHandCursor)
         super().mouseReleaseEvent(event)
 
-    # --- METODI HELPER ---
-    # Centraggio zoom
+    # ==========================================
+    # METODI DI UTILITÀ (HELPER)
+    # ==========================================
     def adjust_scrollbar(self, scrollbar, factor):
+        """Setta scrollbar quando si scala l'immagine"""
         scrollbar.setValue(int(factor * scrollbar.value() + ((factor - 1) * scrollbar.pageStep() / 2)))
 
-
     def adatta_a_finestra(self):
-        """Calcola lo zoom iniziale per adattare l'immagine alla view"""
+        """Calcola lo zoom iniziale necessario per adattare l'immagine alla view"""
         if not self.original_pixmap: return
 
-        # Dimensioni area visibile (viewport)
+        # Dimensioni area visibile
         view_w = self.viewport().width() if self.viewport().width() > 0 else 800
         view_h = self.viewport().height() if self.viewport().height() > 0 else 600
 
+        # Calcolo il rapporto per non deformare l'immagine
         ratio = min(view_w / self.original_pixmap.width(),
                     view_h / self.original_pixmap.height()) * 0.99
 
@@ -100,19 +112,19 @@ class VisualizzatoreBase(QScrollArea):
 
     def aggiorna_visualizzazione(self):
         """
-        Metodo che applica il resize con SmoothTransformation per la massima qualità.
+        Metodo grafico della classe
         """
         if self.original_pixmap:
-            # 1. Calcoliamo la nuova dimensione in base allo zoom
+            # Calcoliamo la nuova dimensione in base allo zoom
             new_size = self.original_pixmap.size() * self.scale_factor
 
-            # 2. Scaliamo l'immagine ORIGINALE usando l'algoritmo ad alta qualità
+            #  Scaliamo l'immagine originale
             pixmap_scalata = self.original_pixmap.scaled(
                 new_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation  # IL SEGRETO DELLA QUALITÀ
+                Qt.TransformationMode.SmoothTransformation
             )
 
-            # 3. Aggiorniamo la dimensione del contenitore e gli passiamo la nuova immagine perfetta
+            # Aggiorniamo la dimensione del contenitore e gli passiamo la nuova immagine perfetta
             self.image_widget.resize(new_size)
             self.image_widget.setPixmap(pixmap_scalata)

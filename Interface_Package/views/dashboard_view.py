@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QHBoxLayout
 
 class ProjectDashboardView(QWidget):
     """
-    View per la Dashboard di riepilogo del progetto
+    View per la Dashboard di riepilogo per i progetti basati su Dataset (Cartelle di immagini).
+    Mostra le statistiche globali, permette di cambiare il campionamento e funge da
+    trampolino di lancio per la schermata di etichettatura.
     """
     # ==========================================
     # SEGNALI
@@ -31,7 +33,7 @@ class ProjectDashboardView(QWidget):
         self.lbl_project_name.setProperty("class", "HeaderTitle")
 
         self.btn_back = QPushButton("← Torna alla Home")
-        self.btn_back.setObjectName("BtnBack")
+        self.btn_back.setProperty("class", "NavButton")
         self.btn_back.clicked.connect(self.richiesta_ritorno_home.emit)
 
         header_layout.addWidget(self.lbl_project_name)
@@ -39,6 +41,7 @@ class ProjectDashboardView(QWidget):
         header_layout.addWidget(self.btn_back)
         main_layout.addLayout(header_layout)
 
+        # --- SCROLL AREA CENTRALE ---
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -48,29 +51,27 @@ class ProjectDashboardView(QWidget):
         content_layout = QVBoxLayout(content_widget)
         content_layout.setSpacing(25)
 
-        # 1. Informazioni Generali
+        # Card: Informazioni Generali
         self.card_info, info_layout = self._crea_card("INFORMAZIONI GENERALI")
-        #self.val_tipo = self._add_info_row(info_layout, "Tipo Input:")
-        self.val_file = self._add_info_row(info_layout, "File Sorgente:")
-        #self.val_patch_size = self._add_info_row(info_layout, "Dimensione Patch:")
+        self.val_file = self._add_info_row(info_layout, "Cartella Sorgente:")
         content_layout.addWidget(self.card_info)
 
-        # 2. Statistiche Campionamento
+        # Card: Statistiche Campionamento
         self.card_stats, stats_layout = self._crea_card("STATISTICHE CAMPIONAMENTO")
-        self.val_teoriche = self._add_info_row(stats_layout, "Patch totali:")
-        #self.val_roi = self._add_info_row(stats_layout, "Patch nelle ROI:")
+        self.val_teoriche = self._add_info_row(stats_layout, "Immagini totali trovate:")
+
+        # Riga custom per lo SpinBox della Percentuale
         row_perc_layout = QHBoxLayout()
-        lbl_perc = QLabel("Percentuale campionamento:")
+        lbl_perc = QLabel("Percentuale da etichettare:")
         lbl_perc.setProperty("class", "InfoLabel")
+
         self.spin_perc = QSpinBox()
-        self.spin_perc.setRange(10, 100)
+        self.spin_perc.setRange(0, 100)
         self.spin_perc.setSingleStep(10)
         self.spin_perc.setSuffix(" %")
         self.spin_perc.setFixedWidth(120)
         self.spin_perc.setMinimumHeight(38)
-        #self.spin_perc.setStyleSheet("background-color: #333; color: white; border: 1px solid #555;")
-
-        self.spin_perc.valueChanged.connect(self.richiesta_cambio_campionamento.emit)
+        self.spin_perc.editingFinished.connect(lambda: self.richiesta_cambio_campionamento.emit(self.spin_perc.value()))
 
         row_perc_layout.addWidget(lbl_perc)
         row_perc_layout.addStretch()
@@ -80,7 +81,7 @@ class ProjectDashboardView(QWidget):
         self.val_sampled = self._add_info_row(stats_layout, "Patch da Etichettare:")
         content_layout.addWidget(self.card_stats)
 
-        # 3. Sezione Progresso
+        # Sezione Progresso
         prog_layout = QVBoxLayout()
         prog_header = QHBoxLayout()
 
@@ -88,7 +89,7 @@ class ProjectDashboardView(QWidget):
         prog_title.setProperty("class", "SectionTitle")
 
         self.lbl_counter = QLabel("0 / 0")
-        self.lbl_counter.setStyleSheet("color: white; font-weight: bold;")
+        self.lbl_counter.setProperty("class", "CounterLabel")
 
         prog_header.addWidget(prog_title)
         prog_header.addStretch()
@@ -104,12 +105,14 @@ class ProjectDashboardView(QWidget):
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
 
-        # --- ACTION AREA ---
+        # --- ACTION AREA (Bottone in basso) ---
         action_layout = QHBoxLayout()
         action_layout.addStretch()
 
         self.btn_main_action = QPushButton("Inizia Etichettatura")
-        self.btn_main_action.setObjectName("BtnMain")
+        self.btn_main_action.setProperty("class", "PrimaryButton")
+        self.btn_main_action.setMinimumWidth(250)
+        self.btn_main_action.setMinimumHeight(45)
         self.btn_main_action.clicked.connect(self.richiesta_inizio_etichettatura.emit)
 
         action_layout.addWidget(self.btn_main_action)
@@ -117,7 +120,9 @@ class ProjectDashboardView(QWidget):
         main_layout.addLayout(action_layout)
 
     def _crea_card(self, titolo: str):
-        """Utility factory per creare card stilizzate in modo omogeneo"""
+        """
+        Utility factory per creare i pannelli che conterranno le righe di informazioni.
+        """
         card = QFrame()
         card.setProperty("class", "Card")
 
@@ -131,13 +136,13 @@ class ProjectDashboardView(QWidget):
 
         linea = QFrame()
         linea.setFrameShape(QFrame.Shape.HLine)
-        linea.setStyleSheet("background-color: #333333; margin-bottom: 10px;")
+        linea.setStyleSheet("background-color: #555555; margin-bottom: 10px;")
         layout.addWidget(linea)
 
         return card, layout
 
     def _add_info_row(self, parent_layout, label_text: str) -> QLabel:
-        """Utility per creare righe campo:valore """
+        """Utility per impaginare perfettamente la coppia 'Titolo : Valore'."""
         row_layout = QHBoxLayout()
         row_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -156,37 +161,35 @@ class ProjectDashboardView(QWidget):
         return val
 
     # ==========================================
-    # API PUBBLICA
+    # API PUBBLICA (Aggiornamento Dati dal Controller)
     # ==========================================
     def display_project(self, data: dict):
         """
-        Popola la dashboard con estrazione sicura dei dati
+        Inietta i dati del JSON nell'interfaccia.
+        Contiene protezioni per non far crashare l'app se mancano chiavi.
         """
         name_project = data.get("case_id", "Progetto senza nome")
         self.lbl_project_name.setText(f"Progetto: {name_project}")
 
         # Info Generali
-
         percorso_sorgente = data.get("source_path", "-")
         self.val_file.setText(os.path.basename(percorso_sorgente))
 
-        # 🟢 FIX 1: Protezione su patching_config
-        patch_conf = data.get("patching_config")
-        patch_conf = patch_conf if isinstance(patch_conf, dict) else {}
-
-        # 🟢 FIX 2: Protezione su progress
+        # Protezione su progress
         prog = data.get("progress")
         prog = prog if isinstance(prog, dict) else {}
         self.val_teoriche.setText(str(prog.get("total_patches", 0)))
 
         # Calcoli di presentazione
         patches = data.get("patches", [])
-        patches = patches if isinstance(patches, list) else [] # Sicurezza extra
+        patches = patches if isinstance(patches, list) else []
 
-        # 🟢 FIX 3: Protezione su sampling_config
+        # Protezione su sampling_config
         samp_conf = data.get("sampling_config")
         samp_conf = samp_conf if isinstance(samp_conf, dict) else {}
         percentuale = samp_conf.get("sampling_percentage", 100)
+
+        # Blocco i segnali per evitare loop infiniti tra View e Controller quando forzo il valore
         self.spin_perc.blockSignals(True)
         self.spin_perc.setValue(percentuale)
         self.spin_perc.blockSignals(False)
@@ -194,7 +197,7 @@ class ProjectDashboardView(QWidget):
         tot_campionate = sum(1 for p in patches if isinstance(p, dict) and p.get("is_sampled") is not False)
         self.val_sampled.setText(f"{tot_campionate}")
 
-        # Progresso
+        # Progresso Lavori
         etichettate = prog.get("labeled_patches", 0)
         self.lbl_counter.setText(f"{etichettate} / {tot_campionate}")
 
@@ -203,11 +206,11 @@ class ProjectDashboardView(QWidget):
             perc_completamento = int((etichettate / tot_campionate) * 100)
             self.progress_bar.setValue(perc_completamento)
 
-        # Logica Testo Bottone Action
+        # Logica Testo Bottone Action (Cambia in base allo stato del lavoro)
         mostrate = prog.get("shown_patches", 0)
         if mostrate == 0:
-            self.btn_main_action.setText("Inizia Etichettatura Patch")
+            self.btn_main_action.setText("Inizia Etichettatura Dataset")
         elif perc_completamento == 100:
-            self.btn_main_action.setText("Revisiona Patch")
+            self.btn_main_action.setText("Revisiona Immagini")
         else:
-            self.btn_main_action.setText("Riprendi Etichettatura Patch")
+            self.btn_main_action.setText("Riprendi Etichettatura")
